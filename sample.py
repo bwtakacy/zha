@@ -5,7 +5,7 @@ class DummyConfig(object):
 
     Users must implement the following methods.
 
-    get_id(): returns cluster-unique string (i.e. hostname)
+    get(keyname):   returns customized values or None. keyname=id is required.
     check_health(): returns 0 for OK, returns 1 for NG, never
     trigger_active() : methods to be called when state changed 
                        from standby to active (i.e. attach VIP and broadcast garp)
@@ -19,8 +19,11 @@ class DummyConfig(object):
     def __init__(self):
         o,x = zha.HealthMonitor.OK, zha.HealthMonitor.NG
         self.health_seq = itertools.cycle([o,o,o,o,o,o,o,o,x,x,x,x,x,x,x,o,o,o,o,o,o,o]) 
-    def get_id(self):
-        return "test"
+        self.properties = {
+                "id": "hostA",
+                }
+    def get(self,key,default=None):
+        return self.properties.get(key,default)
     def check_health(self):
         h = self.health_seq.next()
         print h,

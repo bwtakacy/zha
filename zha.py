@@ -31,7 +31,7 @@ class ZHA(object):
             print "ZHA::ElectorCallback: shoot the node"
             self.zha.trigger_fence()
     def __init__(self, config):
-        assert "get_id" in dir(config)
+        assert config.get("id")
         assert "check_health" in dir(config)
         assert "trigger_active" in dir(config)
         assert "trigger_standby" in dir(config)
@@ -43,7 +43,7 @@ class ZHA(object):
         self.health_state   = HealthMonitor.INIT
         self.election_state = Elector.SBY
         self.monitor = HealthMonitor(config.check_health, callbacks=[self.HealthStateChangeCallback(self)])
-        self.elector = Elector(config.get_id(), callbacks=[self.ElectorStateChangeCallback(self),])
+        self.elector = Elector(config, callbacks=[self.ElectorStateChangeCallback(self),])
         self.monitor.start()
         self.elector.start()
         signal.signal(signal.SIGINT, self.on_sigint)
@@ -93,8 +93,9 @@ from kazoo.client import KazooState
 from kazoo.retry import KazooRetry
 class Elector(threading.Thread):
     ACT, SBY = 1,2
-    def __init__(self, id, callbacks):
+    def __init__(self, config, callbacks):
         threading.Thread.__init__(self)
+        self.config = config
         self.callbacks = callbacks
         self.should_run = True
         self.in_entry = False
@@ -102,7 +103,7 @@ class Elector(threading.Thread):
         self.zk = KazooClient()
         self.zk.add_listener(self.zk_listener)
         self.zk.start()
-        self.id = id
+        self.id = self.config.get("id")
         self.lock = self.zk.Lock(ZNODE_LOCK, id)
     def enter(self):
         self.in_entry = True
