@@ -1,6 +1,9 @@
 import threading
 import time
 import signal
+from kazoo.client import KazooClient
+from kazoo.client import KazooState
+from kazoo.retry import KazooRetry
 
 class ZHA(object):
     class HealthStateChangeCallback(object):
@@ -37,8 +40,8 @@ class ZHA(object):
         self.should_run = True
         self.health_state   = HealthMonitor.INIT
         self.election_state = Elector.SBY
-        self.monitor = HealthMonitor(config, callbacks=[self.HealthStateChangeCallback(self)])
-        self.elector = Elector(config, callbacks=[self.ElectorStateChangeCallback(self),])
+        self.monitor = HealthMonitor(config, [self.HealthStateChangeCallback(self),])
+        self.elector = Elector(config, [self.ElectorStateChangeCallback(self),])
         self.monitor.start()
         self.elector.start()
         signal.signal(signal.SIGINT, self.on_sigint)
@@ -84,9 +87,6 @@ class HealthMonitor(threading.Thread):
             time.sleep(self.config.get("healthcheck_interval",5))
         print "monitor thread stopped."
 
-from kazoo.client import KazooClient
-from kazoo.client import KazooState
-from kazoo.retry import KazooRetry
 class Elector(threading.Thread):
     ACT, SBY = 1,2
     def __init__(self, config, callbacks):
