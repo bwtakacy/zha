@@ -2,10 +2,6 @@ import threading
 import time
 import signal
 
-HEALTHCHECK_INTERVAL_SEC = 5
-RECHECK_INTERVAL_SEC = HEALTHCHECK_INTERVAL_SEC
-LOCK_TIMEOUT = 5
-
 class ZHA(object):
     class HealthStateChangeCallback(object):
         def __init__(self, zha):
@@ -37,10 +33,11 @@ class ZHA(object):
         self.trigger_active = config.trigger_active
         self.trigger_standby = config.trigger_standby
         self.trigger_fence = config.trigger_fence
+        self.config = config
         self.should_run = True
         self.health_state   = HealthMonitor.INIT
         self.election_state = Elector.SBY
-        self.monitor = HealthMonitor(config.check_health, callbacks=[self.HealthStateChangeCallback(self)])
+        self.monitor = HealthMonitor(config, callbacks=[self.HealthStateChangeCallback(self)])
         self.elector = Elector(config, callbacks=[self.ElectorStateChangeCallback(self),])
         self.monitor.start()
         self.elector.start()
@@ -53,7 +50,7 @@ class ZHA(object):
     def mainloop(self):
         while self.should_run:
             self.recheck()
-            time.sleep(RECHECK_INTERVAL_SEC)
+            time.sleep(self.config.get("recheck_interval",5))
         self.monitor.should_run = False
         self.elector.should_run = False
         self.monitor.join()
@@ -65,15 +62,16 @@ class ZHA(object):
 
 class HealthMonitor(threading.Thread):
     OK,NG,INIT = 0,1,2
-    def __init__(self, monitor_impl, callbacks):
+    def __init__(self, config, callbacks):
         threading.Thread.__init__(self)
-        self.monitor_impl = monitor_impl
+        self.config = config
         self.callbacks = callbacks
+        self.check_health = self.config.check_health
         self.state = HealthMonitor.INIT
         self.should_run = True
     def monitor(self):
         try:
-            result = self.monitor_impl()
+            result = self.check_health()
         except:
             result = HealthMonitor.NG
         if self.state != result:
@@ -83,7 +81,7 @@ class HealthMonitor(threading.Thread):
     def run(self):
         while self.should_run:
             self.monitor()
-            time.sleep(HEALTHCHECK_INTERVAL_SEC)
+            time.sleep(self.config.get("healthcheck_interval",5))
         print "monitor thread stopped."
 
 from kazoo.client import KazooClient
@@ -142,10 +140,10 @@ class Elector(threading.Thread):
     def in_elector_loop(self):
         if self.in_entry is False:
             self.zk_safe_release()
-            time.sleep(LOCK_TIMEOUT)
+            time.sleep(self.config.get("elector_interval",3))
             return
         if self.state == Elector.ACT:
-            time.sleep(LOCK_TIMEOUT)
+            time.sleep(self.config.get("elector_interval",3))
             return
         assert self.in_entry is True and self.state == Elector.SBY
         result = self.lock.acquire() #blocks....
