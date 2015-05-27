@@ -165,24 +165,3 @@ class Elector(threading.Thread):
         self.zk.stop()
         print "elector thread stopped."
 
-if __name__ == '__main__':
-    import itertools
-    class DummySystem(object):
-        def __init__(self):
-            o,x = HealthMonitor.OK, HealthMonitor.NG
-            self.health_seq = itertools.cycle([o,o,o,o,o,o,o,o,x,x,x,x,x,x,x,o,o,o,o,o,o,o]) 
-        def get_id(self):
-            return "test"
-        def check_health(self):
-            h = self.health_seq.next()
-            print h,
-            return h
-        def trigger_active(self):
-            print "attach VIP and send garp"
-        def trigger_standby(self):
-            print "detach VIP if exists"
-        def trigger_fence(self):
-            print "STONITH!"
-
-    hza = ZHA(DummySystem())
-    hza.mainloop()
