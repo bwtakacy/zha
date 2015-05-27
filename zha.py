@@ -5,8 +5,6 @@ import signal
 HEALTHCHECK_INTERVAL_SEC = 5
 RECHECK_INTERVAL_SEC = HEALTHCHECK_INTERVAL_SEC
 LOCK_TIMEOUT = 5
-ZNODE_LOCK = "/zha_lock"
-ZNODE_ABC  = "/zha_abc"
 
 class ZHA(object):
     class HealthStateChangeCallback(object):
@@ -100,11 +98,12 @@ class Elector(threading.Thread):
         self.should_run = True
         self.in_entry = False
         self.state = Elector.SBY
-        self.zk = KazooClient()
+        self.zk = KazooClient(hosts=self.config.get("connection_string","127.0.0.1:2181"))
         self.zk.add_listener(self.zk_listener)
         self.zk.start()
         self.id = self.config.get("id")
-        self.lock = self.zk.Lock(ZNODE_LOCK, id)
+        self.lock = self.zk.Lock(self.config.get("lock_znode","/zha-lock"), id)
+        self.abcpath = self.config.get("abc_znode","/zha-abc")
     def enter(self):
         self.in_entry = True
     def leave(self):
@@ -118,21 +117,21 @@ class Elector(threading.Thread):
         else:
             pass
     def handle_abc(self):
-        if not self.zk.exists(ZNODE_ABC):
-            self.zk.create(ZNODE_ABC, self.id)
+        if not self.zk.exists(self.abcpath):
+            self.zk.create(self.abcpath, self.id)
             return
-        data, stat = self.zk.get(ZNODE_ABC)
+        data, stat = self.zk.get(self.abcpath)
         if data.strip()==self.id:
             return
         else:
             for cb in self.callbacks:
                 cb.on_fence()
-            self.zk.set(ZNODE_ABC, self.id)
+            self.zk.set(self.abcpath, self.id)
     def zk_delete_my_abc(self):
-        assert self.zk.exists(ZNODE_ABC)
-        data, stat = self.zk.get(ZNODE_ABC)
+        assert self.zk.exists(self.abcpath)
+        data, stat = self.zk.get(self.abcpath)
         assert data.strip() == self.id
-        self.zk.delete(ZNODE_ABC)
+        self.zk.delete(self.abcpath)
     def zk_safe_release(self):
         if self.state == Elector.ACT:
             self.state = Elector.SBY
