@@ -1,6 +1,6 @@
 import zha
 import itertools
-class DummySystem(object):
+class DummyConfig(object):
     """This is sample class for ZHA.
 
     Users must implement the following methods.
@@ -32,5 +32,5 @@ class DummySystem(object):
     def trigger_fence(self):
         print "script:: exec ipmitool....done"
 
-obj = zha.ZHA(DummySystem())
+obj = zha.ZHA(DummyConfig())
 obj.mainloop()
