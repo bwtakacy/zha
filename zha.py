@@ -100,7 +100,7 @@ class Elector(threading.Thread):
         self.zk.add_listener(self.zk_listener)
         self.zk.start()
         self.id = self.config.get("id")
-        self.lock = self.zk.Lock(self.config.get("lock_znode","/zha-lock"), id)
+        self.lock = self.zk.Lock(self.config.get("lock_znode","/zha-lock"), self.id)
         self.abcpath = self.config.get("abc_znode","/zha-abc")
     def enter(self):
         self.in_entry = True
