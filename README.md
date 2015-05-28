@@ -1,14 +1,14 @@
 # zha
 
-zha is a small python library for fullfilling high availability to an arbitary program.
-zha leverages Apache ZooKeeper and its python bindings Kazoo.
+zha is a small python library that delivers high availability to an arbitary program.
+zha leverages Apache ZooKeeper and its python bindings kazoo, and is inspired from Apache Hadoop(ZKFC).
 
 This project is WIP, no stable release yet.
 
 ## Concepts
 
 - Small and Handy
-- Reliable
+- Well documented
 - Customizable
 
 ## Install
@@ -19,7 +19,8 @@ sudo pip install kazoo
 
 ## Usage
 
-See `sample.py`. It is a standalone program to use zha.
+Create a instance `zha.ZHA` and call its method `mainloop()`.  See `sample.py` for details. 
+This is a standalone program to use zha.
 
 ## LICENCE
 
