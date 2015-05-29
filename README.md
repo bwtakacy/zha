@@ -19,7 +19,7 @@ sudo pip install kazoo
 
 ## Usage
 
-Create a instance `zha.ZHA` and call its method `mainloop()`.  See `sample.py` for details. 
+Create a instance of `zha.ZHA` and call its method `mainloop()`.  See `skelton.py` for details. 
 This is a standalone program to use zha.
 
 ## LICENCE
