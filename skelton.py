@@ -49,6 +49,7 @@ class Config(object):
                 #"elector_interval":   3,
                 #"health_dms_timeout":   10,
         }
+        self._check()
     def get(self,key,default=None):
         return self.properties.get(key,default)
     def check_health(self):
@@ -63,10 +64,10 @@ class Config(object):
 
     def _check(self):
         assert self.get("id",False)
-        assert "check_health" in dir(config)
-        assert "trigger_active" in dir(config)
-        assert "trigger_standby" in dir(config)
-        assert "trigger_fence" in dir(config)
+        assert "check_health" in dir(self)
+        assert "trigger_active" in dir(self)
+        assert "trigger_standby" in dir(self)
+        assert "trigger_fence" in dir(self)
 
     def _trigger_script_with_timeout(self,fname,timeout):
         popen = subprocess.Popen(["/bin/bash","+x",fname])
