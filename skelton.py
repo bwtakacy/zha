@@ -1,29 +1,40 @@
+#!/bin/env python
 import zha
+import os
 import itertools
+import subprocess
+import time
 
 class Config(object):
     """This is skelton config class for ZHA.  Users MUST implement/overwrite the following methods:
 
     get(keyname, defaultvalue): 
-        returns a specified value if keyname exists, otherwise default value.
-        keyname="id" is required to specify zha identity, which MUST be unique among cluster.
+        returns a specified value if keyname exists, otherwise defaultvalue.
+        keyname="id" is REQUIRED to specify zha identity, which MUST be unique among cluster.
         Another keys and default values zha uses are listed in skelton.py.
     check_health(): 
-        returns 0 for OK, returns 1 for NG and throws no exception.
-        This method SHOULD NOT block for a long time, so you should implement timeout.
+        returns 0 for OK, or another integer for NG and throws no exception.
+        This method is adviced not to block for a long time so that health monitor thread
+        can check multiple times within "recheck_interval", which can rescure the situation of
+        ocasional failure of cheak_health().
     trigger_active() : 
-        returns 0 for OK, 1 or throws exception for NG.
-        This methods will be called when state change from standby to active.
-        This method SHOULD NOT block for a long time, so you should implement timeout.
+        returns 0 for OK, another integer for NG, and throws no exception.
+        This method is invoked when this zha is eligible to become active.
+        When this method returns 0, zha considers failover has completed and sets its
+        status active, otherwise keeps its status standby. For NG, all cleanup codes for 
+        another zha invoking trigger_active is REQUIRED to be implemented.
     trigger_standby():
-        returns 0 for OK, 1 or throws exception for NG.
-        This method will be called when state change from active to standby.
-        This method SHOULD NOT block for a long time, so you should implement timeout.
+        returns 0 for OK, another integer for NG, and throws no exception.
+        This method is invoked when this process has ceased to be active, such as
+        health monitor failure or zookeeper connection problem.
+        When this method returns NG, zha considers cleanup should be need for another zha becoming active
+        , which will result in being fenced by another zha.
     trigger_fence(): 
-        MUST always suceed and never throw exceptions.
-        This methods will be called only when state has changed from standby to active 
-        AND the previous active is not did not cleanly retire 
-        AND the previous active is not the host that calls this method.
+        returns 0 for OK, another integer for NG, and throws no exception.
+        This methods will be invoked only when this zha is eligible to become active 
+        AND the previous active zha is not did not cleanly retire 
+        AND the previous active zha is not this zha.
+        This SHOULD always succeed, otherwise this zha stops failover.
     """
 
     def __init__(self):
@@ -36,17 +47,30 @@ class Config(object):
                 #"recheck_interval":   5,
                 #"healthcheck_interval":5,
                 #"elector_interval":   3,
+                #"health_dms_timeout":   10,
         }
     def get(self,key,default=None):
         return self.properties.get(key,default)
     def check_health(self):
         return self.health_seq.next()
+        #return self._trigger_script_with_timeout("impl/check_health.sh", 10)
     def trigger_active(self):
-        print "script:: attached VIP and send garp"
+        return self._trigger_script_with_timeout("./impl/on_active.sh", 10)
     def trigger_standby(self):
-        print "script:: detached VIP if exists"
+        return self._trigger_script_with_timeout("./impl/on_standby.sh", 10)
     def trigger_fence(self):
-        print "script:: exec ipmitool....done"
+        return self._trigger_script_with_timeout("./impl/on_fence.sh", 10)
+
+    def _trigger_script_with_timeout(self,fname,timeout):
+        popen = subprocess.Popen(["/bin/bash","+x",fname])
+        t = 0
+        while t < timeout:
+            popen.poll()
+            if popen.returncode is not None:
+                return popen.returncode
+            time.sleep(0.2)
+            t += 0.2
+        return -1
 
 if __name__ == '__main__':
     obj = zha.ZHA(Config())
