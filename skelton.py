@@ -61,6 +61,13 @@ class Config(object):
     def trigger_fence(self):
         return self._trigger_script_with_timeout("./impl/on_fence.sh", 10)
 
+    def _check(self):
+        assert self.get("id",False)
+        assert "check_health" in dir(config)
+        assert "trigger_active" in dir(config)
+        assert "trigger_standby" in dir(config)
+        assert "trigger_fence" in dir(config)
+
     def _trigger_script_with_timeout(self,fname,timeout):
         popen = subprocess.Popen(["/bin/bash","+x",fname])
         t = 0

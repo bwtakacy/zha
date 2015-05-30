@@ -64,15 +64,10 @@ class ZHA(object):
             print "ZHA::ElectorCallback: shoot the node"
             self.zha.trigger_fence()
     def __init__(self, config):
-        assert config.get("id")
-        assert "check_health" in dir(config)
-        assert "trigger_active" in dir(config)
-        assert "trigger_standby" in dir(config)
-        assert "trigger_fence" in dir(config)
+        self.config = config
         self.trigger_active = config.trigger_active
         self.trigger_standby = config.trigger_standby
         self.trigger_fence = config.trigger_fence
-        self.config = config
 
         self.should_run = True
         self.last_health_ok = None
