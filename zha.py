@@ -43,13 +43,23 @@ class ZHA(object):
         def __init__(self, zha):
             self.zha = zha
         def on_become_active(self):
-            print "ZHA::ElectorCallback: successfully become active"
-            self.zha.election_state = Elector.ACT
-            self.zha.trigger_active()
+            ret = self.zha.trigger_active()
+            if ret == 0:
+                print "ZHA::ElectorCallback: successfully become active"
+                self.zha.election_state = Elector.ACT
+                return True
+            else:
+                print "ZHA::ElectorCallback: activation failed.."
+                return False
         def on_become_active_to_standby(self):
-            print "ZHA::ElectorCallback: successfully become standby"
-            self.zha.election_state = Elector.SBY
-            self.zha.trigger_standby()
+            ret = self.zha.trigger_standby()
+            self.zha.election_state = Elector.SBY # state changed to SBY anyway.
+            if ret == 0:
+                print "ZHA::ElectorCallback: successfully become standby"
+                return True
+            else:
+                print "ZHA::ElectorCallback: could not retire cleanly..."
+                return False
         def on_fence(self):
             print "ZHA::ElectorCallback: shoot the node"
             self.zha.trigger_fence()
@@ -67,8 +77,8 @@ class ZHA(object):
         self.should_run = True
         self.last_health_ok = None
         self.election_state = Elector.SBY
-        self.monitor = HealthMonitor(config, [self.HealthStateUpdateCallback(self),])
-        self.elector = Elector(config, [self.ElectorStateChangeCallback(self),])
+        self.monitor = HealthMonitor(config, self.HealthStateUpdateCallback(self))
+        self.elector = Elector(config, self.ElectorStateChangeCallback(self))
         self.monitor.start()
         self.elector.start()
         signal.signal(signal.SIGINT, self.on_sigint)
@@ -97,17 +107,16 @@ class ZHA(object):
 
 class HealthMonitor(threading.Thread):
     OK,NG,INIT = 0,1,2
-    def __init__(self, config, callbacks):
+    def __init__(self, config, callback):
         threading.Thread.__init__(self)
         self.config = config
-        self.callbacks = callbacks
+        self.callback = callback
         self.check_health = self.config.check_health
         self.state = HealthMonitor.INIT
         self.should_run = True
     def monitor(self):
         result = self.check_health()
-        for cb in self.callbacks:
-            cb.on_state_update(result)
+        self.callback.on_state_update(result)
     def run(self):
         while self.should_run:
             self.monitor()
@@ -116,10 +125,10 @@ class HealthMonitor(threading.Thread):
 
 class Elector(threading.Thread):
     ACT, SBY = 1,2
-    def __init__(self, config, callbacks):
+    def __init__(self, config, callback):
         threading.Thread.__init__(self)
         self.config = config
-        self.callbacks = callbacks
+        self.callback = callback
         self.should_run = True
         self.in_entry = False
         self.state = Elector.SBY
@@ -149,8 +158,7 @@ class Elector(threading.Thread):
         if data.strip()==self.id:
             return
         else:
-            for cb in self.callbacks:
-                cb.on_fence()
+            self.callback.on_fence()
             self.zk.set(self.abcpath, self.id)
     def zk_delete_my_abc(self):
         assert self.zk.exists(self.abcpath)
@@ -159,11 +167,12 @@ class Elector(threading.Thread):
         self.zk.delete(self.abcpath)
     def zk_safe_release(self):
         if self.state == Elector.ACT:
-            self.state = Elector.SBY
-            for cb in self.callbacks:
-                cb.on_become_active_to_standby()
-            self.zk_delete_my_abc()
-            self.lock.release()
+            if self.callback.on_become_active_to_standby():
+                self.zk_delete_my_abc()
+            else:
+                pass #,that is, become standby leaving abc behind.
+        self.state = Elector.SBY
+        self.lock.release()
     def in_elector_loop(self):
         if self.in_entry is False:
             self.zk_safe_release()
@@ -173,20 +182,24 @@ class Elector(threading.Thread):
             time.sleep(self.config.get("elector_interval",3))
             return
         assert self.in_entry is True and self.state == Elector.SBY
-        result = self.lock.acquire() #blocks....
-        if result is False:
+        lock_result = self.lock.acquire() #blocks.... and lock acquired.
+        if lock_result is False:
             return
         if self.in_entry == False:
-            self.lock.release()
+            self.zk_safe_release()
             return
+        self.handle_abc() # including fencing.
+        activate_result = self.callback.on_become_active()
+        if activate_result is False:
+            self.zk_delete_my_abc()
+            self.zk_safe_release()
+            time.sleep(self.config.get("elector_interval",3)) #wait a sec for another zha can lock..
+            return
+        # if reached here, all done with lock
         self.state = Elector.ACT
-        self.handle_abc()
-        for cb in self.callbacks:
-            cb.on_become_active()
     def run(self):
         while self.should_run:
             self.in_elector_loop()
         self.zk_safe_release()
         self.zk.stop()
         print "elector thread stopped."
-
