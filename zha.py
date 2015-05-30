@@ -23,7 +23,6 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
-
 import threading
 import time
 import signal
@@ -32,12 +31,13 @@ from kazoo.client import KazooState
 from kazoo.retry import KazooRetry
 
 class ZHA(object):
-    class HealthStateChangeCallback(object):
+    class HealthStateUpdateCallback(object):
         def __init__(self, zha):
             self.zha = zha
-        def on_state_change(self, state):
-            print "ZHA: Health state changed. %d->%d" %(self.zha.health_state, state)
-            self.zha.health_state = state
+        def on_state_update(self, state):
+            if state == HealthMonitor.OK:
+                self.zha.last_health_ok = time.time()
+            print "ZHA: latest Health state is: %d" %(state)
             self.zha.recheck()
     class ElectorStateChangeCallback(object):
         def __init__(self, zha):
@@ -63,19 +63,25 @@ class ZHA(object):
         self.trigger_standby = config.trigger_standby
         self.trigger_fence = config.trigger_fence
         self.config = config
+
         self.should_run = True
-        self.health_state   = HealthMonitor.INIT
+        self.last_health_ok = None
         self.election_state = Elector.SBY
-        self.monitor = HealthMonitor(config, [self.HealthStateChangeCallback(self),])
+        self.monitor = HealthMonitor(config, [self.HealthStateUpdateCallback(self),])
         self.elector = Elector(config, [self.ElectorStateChangeCallback(self),])
         self.monitor.start()
         self.elector.start()
         signal.signal(signal.SIGINT, self.on_sigint)
     def recheck(self):
-        if self.health_state == HealthMonitor.OK:
-            self.elector.enter()
-        else:
+        if self.last_health_ok is None:
             self.elector.leave()
+            return
+        if time.time() - self.last_health_ok < self.config.get("health_dms_timeout",10):
+            self.elector.enter()
+            return
+        else: #dms timeout
+            self.elector.leave()
+            return
     def mainloop(self):
         while self.should_run:
             self.recheck()
@@ -99,14 +105,9 @@ class HealthMonitor(threading.Thread):
         self.state = HealthMonitor.INIT
         self.should_run = True
     def monitor(self):
-        try:
-            result = self.check_health()
-        except:
-            result = HealthMonitor.NG
-        if self.state != result:
-            self.state = result
-            for cb in self.callbacks:
-                cb.on_state_change(result)
+        result = self.check_health()
+        for cb in self.callbacks:
+            cb.on_state_update(result)
     def run(self):
         while self.should_run:
             self.monitor()
