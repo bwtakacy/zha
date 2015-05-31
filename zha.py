@@ -78,6 +78,7 @@ class ZHA(object):
         self.trigger_active  = self._deco_returns_minusone_on_Exception(config.trigger_active)
         self.trigger_standby = self._deco_returns_minusone_on_Exception(config.trigger_standby)
         self.trigger_fence   = self._deco_returns_minusone_on_Exception(config.trigger_fence)
+        self.check_health    = self._deco_returns_minusone_on_Exception(config.check_health)
         self.should_run = True
         self.last_health_ok = None
         self.election_state = Elector.SBY
@@ -120,7 +121,7 @@ class HealthMonitor(threading.Thread):
         threading.Thread.__init__(self)
         self.config = config
         self.callback = callback
-        self.check_health = self.config.check_health
+        self.check_health = self.callback.zha.check_health
         self.state = HealthMonitor.INIT
         self.should_run = True
     def monitor(self):
