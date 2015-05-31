@@ -23,9 +23,16 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
+
 import threading
 import time
 import signal
+
+import logging
+FORMAT = '%(asctime)-15s %(message)s'
+logging.basicConfig(format=FORMAT, level=logging.INFO)
+logger = logging.getLogger('zha')
+
 from kazoo.client import KazooClient
 from kazoo.client import KazooState
 from kazoo.retry import KazooRetry
@@ -37,32 +44,35 @@ class ZHA(object):
         def on_state_update(self, state):
             if state == HealthMonitor.OK:
                 self.zha.last_health_ok = time.time()
-            print "ZHA: latest Health state is: %d" %(state)
+            logger.info("ZHA: latest Health state is: %d" %(state))
             self.zha.recheck()
     class ElectorStateChangeCallback(object):
         def __init__(self, zha):
             self.zha = zha
         def on_become_active(self):
-            ret = self.zha.trigger_active()
-            if ret == 0:
-                print "ZHA::ElectorCallback: successfully become active"
+            if self.zha.trigger_active() == 0:
+                logger.info("ZHA::ElectorCallback: successfully become active")
                 self.zha.election_state = Elector.ACT
                 return True
             else:
-                print "ZHA::ElectorCallback: activation failed.."
+                logger.info("ZHA::ElectorCallback: activation failed..")
                 return False
         def on_become_active_to_standby(self):
-            ret = self.zha.trigger_standby()
             self.zha.election_state = Elector.SBY # state changed to SBY anyway.
-            if ret == 0:
-                print "ZHA::ElectorCallback: successfully become standby"
+            if self.zha.trigger_standby() == 0:
+                logger.info("ZHA::ElectorCallback: successfully become standby")
                 return True
             else:
-                print "ZHA::ElectorCallback: could not retire cleanly..."
+                logger.info("ZHA::ElectorCallback: could not retire cleanly...")
                 return False
         def on_fence(self):
-            print "ZHA::ElectorCallback: shoot the node"
-            self.zha.trigger_fence()
+            if self.zha.trigger_fence() == 0:
+                logger.info("ZHA::ElectorCallback: shooted the node")
+                return True
+            else:
+                logger.info("ZHA::ElectorCallback: could not retire cleanly...")
+                return False
+
     def __init__(self, config):
         self.config = config
         self.trigger_active  = self._deco_returns_minusone_on_Exception(config.trigger_active)
@@ -94,7 +104,7 @@ class ZHA(object):
         self.elector.should_run = False
         self.monitor.join()
         self.elector.join()
-        print "ZHA: main thread stopped."
+        logger.info("ZHA: main thread stopped.")
     def on_sigint(self,sig,frm):
         self.should_run = False
     def _deco_returns_minusone_on_Exception(self, orig_func):
@@ -120,7 +130,7 @@ class HealthMonitor(threading.Thread):
         while self.should_run:
             self.monitor()
             time.sleep(self.config.get("healthcheck_interval",5))
-        print "monitor thread stopped."
+        logger.info("monitor thread stopped.")
 
 class Elector(threading.Thread):
     ACT, SBY = 1,2
@@ -131,7 +141,7 @@ class Elector(threading.Thread):
         self.should_run = True
         self.in_entry = False
         self.state = Elector.SBY
-        self.zk = KazooClient(hosts=self.config.get("connection_string","127.0.0.1:2181"))
+        self.zk = KazooClient(hosts=self.config.get("connection_string","127.0.0.1:2181"), logger=logger)
         self.zk.add_listener(self.zk_listener)
         self.zk.start()
         self.id = self.config.get("id")
@@ -143,7 +153,7 @@ class Elector(threading.Thread):
         self.in_entry = False
     def zk_listener(self,zkstate):
         if zkstate == KazooState.LOST:
-            print "(connection to zookeeper is lost/closed)"
+            logger.info("(connection to zookeeper is lost/closed)")
             self.zk_safe_release()
         elif zkstate == KazooState.SUSPENDED:
             pass
@@ -204,4 +214,4 @@ class Elector(threading.Thread):
             self.in_elector_loop()
         self.zk_safe_release()
         self.zk.stop()
-        print "elector thread stopped."
+        logger.info("elector thread stopped.")
