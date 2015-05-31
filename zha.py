@@ -65,10 +65,9 @@ class ZHA(object):
             self.zha.trigger_fence()
     def __init__(self, config):
         self.config = config
-        self.trigger_active = config.trigger_active
-        self.trigger_standby = config.trigger_standby
-        self.trigger_fence = config.trigger_fence
-
+        self.trigger_active  = self._deco_returns_minusone_on_Exception(config.trigger_active)
+        self.trigger_standby = self._deco_returns_minusone_on_Exception(config.trigger_standby)
+        self.trigger_fence   = self._deco_returns_minusone_on_Exception(config.trigger_fence)
         self.should_run = True
         self.last_health_ok = None
         self.election_state = Elector.SBY
@@ -98,6 +97,12 @@ class ZHA(object):
         print "ZHA: main thread stopped."
     def on_sigint(self,sig,frm):
         self.should_run = False
+    def _deco_returns_minusone_on_Exception(self, orig_func):
+        def func():
+            try:    ret = orig_func()
+            except: ret = -1
+            return ret
+        return func
 
 class HealthMonitor(threading.Thread):
     OK,NG,INIT = 0,1,2
@@ -152,7 +157,7 @@ class Elector(threading.Thread):
         if data.strip()==self.id:
             return
         else:
-            if self.callback.on_fence() is False
+            if self.callback.on_fence() is False:
                 return False
             self.zk.set(self.abcpath, self.id)
         return True
