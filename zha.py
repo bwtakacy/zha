@@ -98,7 +98,6 @@ class ZHA(object):
         print "ZHA: main thread stopped."
     def on_sigint(self,sig,frm):
         self.should_run = False
-        self.monitor.should_run = False
 
 class HealthMonitor(threading.Thread):
     OK,NG,INIT = 0,1,2
