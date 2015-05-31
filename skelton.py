@@ -5,6 +5,16 @@ import itertools
 import subprocess
 import time
 
+def returns_minusone_on_Exception(orig_func):
+    def func(*args,**kwards):
+        try:
+            ret = orig_func(*args,**kwards)
+        except Exception, e:
+            ret = -1
+            print e
+        return ret
+    return func
+
 class Config(object):
     """This is skelton config class for ZHA.  Users MUST implement/overwrite the following methods:
 
@@ -52,13 +62,21 @@ class Config(object):
         self._check()
     def get(self,key,default=None):
         return self.properties.get(key,default)
+
+    @returns_minusone_on_Exception
     def check_health(self):
         return self.health_seq.next()
         #return self._trigger_script_with_timeout("impl/check_health.sh", 10)
+
+    @returns_minusone_on_Exception
     def trigger_active(self):
-        return self._trigger_script_with_timeout("./impl/on_active.sh", 10)
+        return self._trigger_script_with_timeout( "./impl/on_active.sh", 10)
+
+    @returns_minusone_on_Exception
     def trigger_standby(self):
         return self._trigger_script_with_timeout("./impl/on_standby.sh", 10)
+
+    @returns_minusone_on_Exception
     def trigger_fence(self):
         return self._trigger_script_with_timeout("./impl/on_fence.sh", 10)
 
@@ -78,7 +96,7 @@ class Config(object):
                 return popen.returncode
             time.sleep(0.2)
             t += 0.2
-        return -1
+        raise Exception("Script timeout")
 
 if __name__ == '__main__':
     obj = zha.ZHA(Config())
