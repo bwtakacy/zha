@@ -152,8 +152,10 @@ class Elector(threading.Thread):
         if data.strip()==self.id:
             return
         else:
-            self.callback.on_fence()
+            if self.callback.on_fence() is False
+                return False
             self.zk.set(self.abcpath, self.id)
+        return True
     def zk_delete_my_abc(self):
         assert self.zk.exists(self.abcpath)
         data, stat = self.zk.get(self.abcpath)
@@ -182,9 +184,10 @@ class Elector(threading.Thread):
         if self.in_entry == False:
             self.zk_safe_release()
             return
-        self.handle_abc() # including fencing.
-        activate_result = self.callback.on_become_active()
-        if activate_result is False:
+        if self.handle_abc() is False:
+            self.zk_safe_release()
+            return
+        if self.callback.on_become_active() is False:
             self.zk_delete_my_abc()
             self.zk_safe_release()
             time.sleep(self.config.get("elector_interval",3)) #wait a sec for another zha can lock..
