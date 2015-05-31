@@ -58,6 +58,9 @@ class Config(object):
                 #"healthcheck_interval":5,
                 #"elector_interval":   3,
                 #"health_dms_timeout":   10,
+
+                "vip":                  "127.0.0.2/8",
+                "iface":                "lo"
         }
         self._check()
     def get(self,key,default=None):
@@ -66,19 +69,24 @@ class Config(object):
     @returns_minusone_on_Exception
     def check_health(self):
         return self.health_seq.next()
-        #return self._trigger_script_with_timeout("impl/check_health.sh", 10)
+        #return self._trigger_script_with_timeout(10, "impl/check_health.sh")
 
     @returns_minusone_on_Exception
     def trigger_active(self):
-        return self._trigger_script_with_timeout( "./impl/on_active.sh", 10)
+        vip   = self.get("vip","")
+        iface = self.get("iface","")
+        return self._trigger_script_with_timeout(10, "./impl/on_active.sh"%locals(), vip, iface)
 
     @returns_minusone_on_Exception
     def trigger_standby(self):
-        return self._trigger_script_with_timeout("./impl/on_standby.sh", 10)
+        vip   = self.get("vip","")
+        iface = self.get("iface","")
+        return self._trigger_script_with_timeout(10, "./impl/on_standby.sh"%locals(), vip, iface)
 
     @returns_minusone_on_Exception
     def trigger_fence(self):
-        return self._trigger_script_with_timeout("./impl/on_fence.sh", 10)
+        myid = self.get("id","")
+        return self._trigger_script_with_timeout(10, "./impl/on_fence.sh", myid)
 
     def _check(self):
         assert self.get("id",False)
@@ -87,8 +95,10 @@ class Config(object):
         assert "trigger_standby" in dir(self)
         assert "trigger_fence" in dir(self)
 
-    def _trigger_script_with_timeout(self,fname,timeout):
-        popen = subprocess.Popen(["/bin/bash","+x",fname])
+    def _trigger_script_with_timeout(self,timeout, fname,*args):
+        popen_args = ["/bin/bash",fname]
+        popen_args.extend(args)
+        popen = subprocess.Popen(popen_args)
         t = 0
         while t < timeout:
             popen.poll()
