@@ -109,8 +109,8 @@ class ZHA(object):
     def on_sigint(self,sig,frm):
         self.should_run = False
     def _deco_returns_minusone_on_Exception(self, orig_func):
-        def func():
-            try:    ret = orig_func()
+        def func(*a,**k):
+            try:    ret = orig_func(*a,**k)
             except: ret = -1
             return ret
         return func
@@ -125,7 +125,7 @@ class HealthMonitor(threading.Thread):
         self.state = HealthMonitor.INIT
         self.should_run = True
     def monitor(self):
-        result = self.check_health()
+        result = self.check_health(self.callback.zha.election_state)
         self.callback.on_state_update(result)
     def run(self):
         while self.should_run:

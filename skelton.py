@@ -22,11 +22,12 @@ class Config(object):
         returns a specified value if keyname exists, otherwise defaultvalue.
         keyname="id" is REQUIRED to specify zha identity, which MUST be unique among cluster.
         Another keys and default values zha uses are listed in skelton.py.
-    check_health(): 
+    check_health(state): 
         returns 0 for OK, or another integer for NG and throws no exception.
         This method is adviced not to block for a long time so that health monitor thread
-        can check multiple times within "recheck_interval", which can rescure the situation of
-        ocasional failure of cheak_health().
+        can check multiple times within "health_dms_timeout", which can rescure the situation of
+        ocasional failure of cheak_health(). When invoked with state=1, then do health check for ACT,
+        and with state=2, do healthcheck for SBY.
     trigger_active() : 
         returns 0 for OK, another integer for NG, and throws no exception.
         This method is invoked when this zha is eligible to become active.
@@ -67,21 +68,21 @@ class Config(object):
         return self.properties.get(key,default)
 
     @returns_minusone_on_Exception
-    def check_health(self):
+    def check_health(self, estate):
         return self.health_seq.next()
-        #return self._trigger_script_with_timeout(10, "impl/check_health.sh")
+        #return self._trigger_script_with_timeout(10, "impl/check_health.sh", estate)
 
     @returns_minusone_on_Exception
     def trigger_active(self):
         vip   = self.get("vip","")
         iface = self.get("iface","")
-        return self._trigger_script_with_timeout(10, "./impl/on_active.sh"%locals(), vip, iface)
+        return self._trigger_script_with_timeout(10, "./impl/on_active.sh", vip, iface)
 
     @returns_minusone_on_Exception
     def trigger_standby(self):
         vip   = self.get("vip","")
         iface = self.get("iface","")
-        return self._trigger_script_with_timeout(10, "./impl/on_standby.sh"%locals(), vip, iface)
+        return self._trigger_script_with_timeout(10, "./impl/on_standby.sh", vip, iface)
 
     @returns_minusone_on_Exception
     def trigger_fence(self):
