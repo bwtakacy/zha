@@ -35,6 +35,7 @@ logger = logging.getLogger('zha')
 
 from kazoo.client import KazooClient
 from kazoo.client import KazooState
+from kazoo.exceptions import LockTimeout
 
 class ZHA(object):
     class HealthStateUpdateCallback(object):
@@ -152,66 +153,76 @@ class Elector(threading.Thread):
     def leave(self):
         self.in_entry = False
     def zk_listener(self,zkstate):
+        logger.info("zookeeper connection state changed %s"%(zkstate,) )
         if zkstate == KazooState.LOST:
             logger.info("(connection to zookeeper is lost/closed)")
-            self.zk_safe_release()
+            if self.state != Elector.ACT:
+                return
+            logger.info("become standby due to zk connection problem.")
+            self.callback.on_become_active_to_standby()
+            self.state = Elector.SBY
         elif zkstate == KazooState.SUSPENDED:
-            pass
+            return
         else:
-            pass
+            return
     def handle_abc(self):
         if not self.zk.retry(self.zk.exists,self.abcpath):
-            self.zk.retry(self.zk.create,self.abcpath, self.id)
-            return
-        data, stat = self.zk.retry(self.zk.get,self.abcpath)
+            self.zk.retry(self.zk.create, self.abcpath, self.id)
+            return True
+        data, stat = self.zk.retry(self.zk.get, self.abcpath)
         if data.strip()==self.id:
-            return
+            return True
         else:
             if self.callback.on_fence() is False:
                 return False
-            self.zk.retry(self.zkset,self.abcpath, self.id)
+            self.zk.retry(self.zk.set, self.abcpath, self.id)
         return True
     def zk_delete_my_abc(self):
-        assert self.zk.retry(self.zk.exists,self.abcpath)
-        data, stat = self.zk.retry(self.zk.get,self.abcpath)
-        assert data.strip() == self.id
-        self.zk.retry(self.zk.delete,self.abcpath)
-    def zk_safe_release(self):
+        try:
+            data, stat = self.zk.get(self.abcpath)
+            assert data.strip() == self.id
+            self.zk.delete(self.abcpath)
+            return True
+        except:
+            return False
+    def retire(self):
         if self.state == Elector.ACT:
             if self.callback.on_become_active_to_standby():
-                self.zk_delete_my_abc()
+                self.zk_delete_my_abc() #dont care it succeeds or not.
             else:
                 pass #,that is, become standby leaving abc behind.
         self.state = Elector.SBY
         self.lock.release()
     def in_elector_loop(self):
+        if self.zk.state != KazooState.CONNECTED:
+            # zk listener will callback on LOST, so no need to call self.retire(),
+            # but it takes a bit long to be LOST. Mostly other zha will fence me.
+            return
         if self.in_entry is False:
-            self.zk_safe_release()
-            time.sleep(self.config.get("elector_interval",3))
+            self.retire()
             return
         if self.state == Elector.ACT:
-            time.sleep(self.config.get("elector_interval",3))
             return
         assert self.in_entry is True and self.state == Elector.SBY
-        lock_result = self.lock.acquire() #blocks.... and lock acquired.
-        if lock_result is False:
-            return
-        if self.in_entry == False:
-            self.zk_safe_release()
+        try:
+            lock_result = self.lock.acquire(timeout=self.config.get("elector_interval",3))
+        except LockTimeout:
+            self.retire()
+            logger.info("lock timeout")
             return
         if self.handle_abc() is False:
-            self.zk_safe_release()
+            self.retire()
             return
         if self.callback.on_become_active() is False:
             self.zk_delete_my_abc()
-            self.zk_safe_release()
-            time.sleep(self.config.get("elector_interval",3)) #wait a sec for another zha can lock..
+            self.retire()
             return
         # if reached here, all done with lock
         self.state = Elector.ACT
     def run(self):
         while self.should_run:
             self.in_elector_loop()
-        self.zk_safe_release()
+            time.sleep(self.config.get("elector_interval",3))
+        self.retire()
         self.zk.stop()
         logger.info("elector thread stopped.")

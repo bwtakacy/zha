@@ -1,6 +1,6 @@
 from kazoo.client import KazooClient
 
-ZNODE_LOCK = "/zha_lock"
+ZNODE_LOCK = "/zha-lock"
 zk = KazooClient(hosts='127.0.0.1:2181')
 lock = zk.Lock(ZNODE_LOCK)
 zk.start()
