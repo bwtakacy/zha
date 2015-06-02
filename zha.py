@@ -35,7 +35,6 @@ logger = logging.getLogger('zha')
 
 from kazoo.client import KazooClient
 from kazoo.client import KazooState
-from kazoo.retry import KazooRetry
 
 class ZHA(object):
     class HealthStateUpdateCallback(object):
@@ -161,22 +160,22 @@ class Elector(threading.Thread):
         else:
             pass
     def handle_abc(self):
-        if not self.zk.exists(self.abcpath):
-            self.zk.create(self.abcpath, self.id)
+        if not self.zk.retry(self.zk.exists,self.abcpath):
+            self.zk.retry(self.zk.create,self.abcpath, self.id)
             return
-        data, stat = self.zk.get(self.abcpath)
+        data, stat = self.zk.retry(self.zk.get,self.abcpath)
         if data.strip()==self.id:
             return
         else:
             if self.callback.on_fence() is False:
                 return False
-            self.zk.set(self.abcpath, self.id)
+            self.zk.retry(self.zkset,self.abcpath, self.id)
         return True
     def zk_delete_my_abc(self):
-        assert self.zk.exists(self.abcpath)
-        data, stat = self.zk.get(self.abcpath)
+        assert self.zk.retry(self.zk.exists,self.abcpath)
+        data, stat = self.zk.retry(self.zk.get,self.abcpath)
         assert data.strip() == self.id
-        self.zk.delete(self.abcpath)
+        self.zk.retry(self.zk.delete,self.abcpath)
     def zk_safe_release(self):
         if self.state == Elector.ACT:
             if self.callback.on_become_active_to_standby():
