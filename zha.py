@@ -39,58 +39,19 @@ from kazoo.exceptions import LockTimeout
 
 class ZHA(object):
     ACT, SBY = 0, 1
-    class HealthStateUpdateCallback(object):
-        def __init__(self, zha):
-            self.zha = zha
-        def on_state_update(self, state):
-            if state & HealthMonitor.ACT_OK == HealthMonitor.ACT_OK:
-                self.zha.last_health_ok_act = time.time()
-            if state & HealthMonitor.SBY_OK == HealthMonitor.SBY_OK:
-                self.zha.last_health_ok_sby = time.time()
-            logger.info("ZHA: latest Health state is: %d" %(state))
-            self.zha.recheck()
-    class ElectorStateChangeCallback(object):
-        def __init__(self, zha):
-            self.zha = zha
-        def on_become_active(self):
-            if self.zha.become_active() == 0:
-                logger.info("ZHA::ElectorCallback: successfully become active")
-                self.zha.election_state = ZHA.ACT
-                return True
-            else:
-                logger.info("ZHA::ElectorCallback: activation failed..")
-                return False
-        def on_become_active_to_standby(self):
-            self.zha.election_state = ZHA.SBY # state changed to SBY anyway.
-            if self.zha.trigger_standby_from_active() == 0:
-                logger.info("ZHA::ElectorCallback: successfully become standby")
-                return True
-            else:
-                logger.info("ZHA::ElectorCallback: could not retire cleanly...")
-                return False
-        def on_fence(self):
-            if self.zha.trigger_fence() == 0:
-                logger.info("ZHA::ElectorCallback: shooted the node")
-                return True
-            else:
-                logger.info("ZHA::ElectorCallback: could not retire cleanly...")
-                return False
-
     def __init__(self, config):
         self.config = config
-        self.become_active  = self._deco_returns_minusone_on_Exception(config.become_active)
-        self.trigger_standby_from_active = self._deco_returns_minusone_on_Exception(config.trigger_standby_from_active)
-        self.trigger_fence   = self._deco_returns_minusone_on_Exception(config.trigger_fence)
-        self.check_health    = self._deco_returns_minusone_on_Exception(config.check_health)
-        self.should_run = True
         self.last_health_ok_act = None
         self.last_health_ok_sby = None
         self.election_state = ZHA.SBY
-        self.monitor = HealthMonitor(config, self.HealthStateUpdateCallback(self))
-        self.elector = Elector(config, self.ElectorStateChangeCallback(self))
-        self.monitor.start()
-        self.elector.start()
+        self.hmonitor = HealthMonitor(self)
+        self.cmonitor = ClusterMonitor(self)
+        self.elector = Elector(self)
         signal.signal(signal.SIGINT, self.on_sigint)
+    def on_sigint(self,sig,frm):
+        self.should_run = False
+    def get_config(self):
+        return self.config
     def recheck(self):
         if self.last_health_ok_act is None:
             self.elector.in_entry_act = False
@@ -102,97 +63,109 @@ class ZHA(object):
             self.elector.in_entry_act = False
             return
     def mainloop(self):
+        self.should_run = True
+        threads = [self.hmonitor, self.cmonitor, self.elector]
+        for th in threads:
+            th.start()
         while self.should_run:
             self.recheck()
             time.sleep(self.config.get("recheck_interval",5))
-        self.monitor.should_run = False
-        self.elector.should_run = False
-        self.monitor.join()
-        self.elector.join()
+        for th in threads:
+            th.should_run = False
+        for th in threads:
+            th.join()
         logger.info("ZHA: main thread stopped.")
-    def on_sigint(self,sig,frm):
-        self.should_run = False
-    def _deco_returns_minusone_on_Exception(self, orig_func):
-        def func(*a,**k):
-            try:    ret = orig_func(*a,**k)
-            except: ret = -1
-            return ret
-        return func
 
 class HealthMonitor(threading.Thread):
+    """periodically checks resource health. This changes ZHA.last_health_ok_act/sby"""
     SBY_OK,ACT_OK = 1,2
-    def __init__(self, config, callback):
+    def __init__(self,zha):
         threading.Thread.__init__(self)
-        self.config = config
-        self.callback = callback
-        self.check_health = self.callback.zha.check_health
+        self.zha = zha
         self.should_run = True
     def monitor(self):
-        result = self.check_health()
-        self.callback.on_state_update(result)
+        state = self.zha.get_config().check_health()
+        if state & HealthMonitor.ACT_OK == HealthMonitor.ACT_OK:
+            self.zha.last_health_ok_act = time.time()
+        if state & HealthMonitor.SBY_OK == HealthMonitor.SBY_OK:
+            self.zha.last_health_ok_sby = time.time()
+        logger.info("ZHA: latest Health state is: %d" %(state))
+        self.zha.recheck()
     def run(self):
         while self.should_run:
             self.monitor()
-            time.sleep(self.config.get("healthcheck_interval",5))
-        logger.info("monitor thread stopped.")
+            time.sleep(self.zha.get_config().get("healthcheck_interval",5))
+        logger.info("health monitor thread stopped.")
+
+class ClusterMonitor(threading.Thread):
+    """periodically checks cluster member."""
+    def __init__(self, zha):
+        threading.Thread.__init__(self)
+        self.zha = zha
+        self.should_run = True
+    def monitor(self):
+        result = self.zha.get_config().check_cluster()
+        pass
+    def run(self):
+        while self.should_run:
+            time.sleep(self.zha.get_config().get("healthcheck_interval",5))
+        logger.info("cluster monitor thread stopped.")
+    def check_cluster(self):
+        return True
 
 class Elector(threading.Thread):
+
     LOCKING, NOLOCK = 1,2
-    def __init__(self, config, callback):
+    def __init__(self, zha):
         threading.Thread.__init__(self)
-        self.config = config
-        self.callback = callback
+        self.zha = zha
         self.should_run = True
         self.in_entry_act = False
         self.in_entry_sby = False
+
         self.state = Elector.NOLOCK
-        self.zk = KazooClient(hosts=self.config.get("connection_string","127.0.0.1:2181"), logger=logger)
+        self.zk = KazooClient(hosts=self.zha.get_config().get("connection_string","127.0.0.1:2181"), logger=logger)
         self.zk.add_listener(self.zk_listener)
         self.zk.start()
-        self.id = self.config.get("id")
-        self.lock = self.zk.Lock(self.config.get("lock_znode","/zha-lock"), self.id)
-        self.abcpath = self.config.get("abc_znode","/zha-abc")
-    def zk_listener(self,zkstate):
-        logger.info("zookeeper connection state changed %s"%(zkstate,) )
-        if zkstate == KazooState.LOST:
-            logger.info("(connection to zookeeper is lost/closed)")
-            if self.state != Elector.LOCKING:
-                return
-            logger.info("become standby due to zk connection problem.")
-            self.callback.on_become_active_to_standby()
-            self.state = Elector.NOLOCK
-        elif zkstate == KazooState.SUSPENDED:
-            return
-        else:
-            return
-    def handle_abc(self):
-        if not self.zk.retry(self.zk.exists,self.abcpath):
-            self.zk.retry(self.zk.create, self.abcpath, self.id)
-            return True
-        data, stat = self.zk.retry(self.zk.get, self.abcpath)
-        if data.strip()==self.id:
+        self.id = self.zha.get_config().get("id")
+        self.lock = self.zk.Lock(self.zha.get_config().get("lock_znode","/zha-lock"), self.id)
+        self.abcpath = self.zha.get_config().get("abc_znode","/zha-abc")
+
+    #callbacks
+    def on_become_active(self):
+        if self.zha.get_config().become_active() == 0:
+            logger.info("successfully become active")
+            self.zha.election_state = ZHA.ACT
             return True
         else:
-            if self.callback.on_fence() is False:
-                return False
-            self.zk.retry(self.zk.set, self.abcpath, self.id)
-        return True
-    def zk_delete_my_abc(self):
-        try:
-            data, stat = self.zk.get(self.abcpath)
-            assert data.strip() == self.id
-            self.zk.delete(self.abcpath)
-            return True
-        except:
+            logger.info("activation failed..")
             return False
-    def retire(self):
-        if self.state == Elector.LOCKING:
-            if self.callback.on_become_active_to_standby():
-                self.zk_delete_my_abc() #dont care it succeeds or not.
-            else:
-                pass #,that is, become standby leaving abc behind.
-        self.state = Elector.NOLOCK
-        self.lock.release()
+
+    def on_become_active_to_standby(self):
+        self.zha.election_state = ZHA.SBY # state changed to SBY anyway.
+        if self.zha.get_config().become_standby_from_active() == 0:
+            logger.info("successfully become standby")
+            return True
+        else:
+            logger.info("could not retire cleanly...")
+            return False
+
+    def on_fence(self):
+        if self.zha.get_config().trigger_fence() == 0:
+            logger.info("shooted the node")
+            return True
+        else:
+            logger.info("could not retire cleanly...")
+            return False
+
+    def run(self):
+        while self.should_run:
+            self.in_elector_loop()
+            time.sleep(self.zha.get_config().get("elector_interval",3))
+        self.retire()
+        self.zk.stop()
+        logger.info("elector thread stopped.")
+
     def in_elector_loop(self):
         if self.zk.state != KazooState.CONNECTED:
             # zk listener will callback on LOST, so no need to call self.retire(),
@@ -206,7 +179,7 @@ class Elector(threading.Thread):
             return
         #for waiters 
         try:
-            lock_result = self.lock.acquire(timeout=self.config.get("elector_interval",3))
+            lock_result = self.lock.acquire(timeout=self.zha.get_config().get("elector_interval",3))
         except LockTimeout:
             self.retire()
             logger.info("lock timeout")
@@ -217,16 +190,55 @@ class Elector(threading.Thread):
         if self.handle_abc() is False:
             self.retire()
             return
-        if self.callback.on_become_active() is False:
+        if self.on_become_active() is False:
             self.zk_delete_my_abc()
             self.retire()
             return
         # if reached here, all done with lock
         self.state = Elector.LOCKING
-    def run(self):
-        while self.should_run:
-            self.in_elector_loop()
-            time.sleep(self.config.get("elector_interval",3))
-        self.retire()
-        self.zk.stop()
-        logger.info("elector thread stopped.")
+
+    def zk_listener(self,zkstate):
+        logger.info("zookeeper connection state changed %s"%(zkstate,) )
+        if zkstate == KazooState.LOST:
+            logger.info("(connection to zookeeper is lost/closed)")
+            if self.state != Elector.LOCKING:
+                return
+            logger.info("become standby due to zk connection problem.")
+            self.on_become_active_to_standby()
+            self.state = Elector.NOLOCK
+        elif zkstate == KazooState.SUSPENDED:
+            return
+        else:
+            return
+
+    def retire(self):
+        if self.state == Elector.LOCKING:
+            if self.on_become_active_to_standby():
+                self.zk_delete_my_abc() #dont care it succeeds or not.
+            else:
+                pass #,that is, become standby leaving abc behind.
+        self.state = Elector.NOLOCK
+        self.lock.release()
+
+    def handle_abc(self):
+        if not self.zk.retry(self.zk.exists,self.abcpath):
+            self.zk.retry(self.zk.create, self.abcpath, self.id)
+            return True
+        data, stat = self.zk.retry(self.zk.get, self.abcpath)
+        if data.strip()==self.id:
+            return True
+        else:
+            if self.zha.get_config().on_fence() is False:
+                return False
+            self.zk.retry(self.zk.set, self.abcpath, self.id)
+        return True
+
+    def zk_delete_my_abc(self):
+        try:
+            data, stat = self.zk.get(self.abcpath)
+            assert data.strip() == self.id
+            self.zk.delete(self.abcpath)
+            return True
+        except:
+            return False
+

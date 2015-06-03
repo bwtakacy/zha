@@ -40,6 +40,14 @@ class Config(object):
         another zha invoking become_active is REQUIRED to be implemented.
         This method SHOULD be reentrant, because some resources becomes already  active
         before zha starts up.
+    become_clustered():
+        returns 0 for OK, another integer for NG.
+        CLUSTERED is a ACT state with at least one SBYs. Some middleware, such as PostgreSQL
+        requires clustered/declustered configuration.
+    become_declustered():
+        returns 0 for OK, another integer for NG.
+        DECLUSTERED is a ACT state with at no SBYs. Some middleware, such as PostgreSQL
+        requires clustered/declustered configuration.
     become_standby_from_active():
         returns 0 for OK, another integer for NG, and throws no exception.
         This method is invoked when this process has ceased to be active, such as
@@ -53,6 +61,9 @@ class Config(object):
         AND the previous active zha is not did not cleanly retire 
         AND the previous active zha is not this zha.
         This SHOULD always succeed, otherwise this zha stops failover.
+    
+    Belows are possible state transisiton zha assumes. each state has its eligility
+        SBY <--> ACT(DECLUSTED) <---> ACT(CLUSTERED)
     """
 
     def __init__(self):
@@ -70,7 +81,7 @@ class Config(object):
                 "vip":                  "127.0.0.2/8",
                 "iface":                "lo"
         }
-        self._check()
+
     def get(self,key,default=None):
         return self.properties.get(key,default)
 
@@ -86,6 +97,14 @@ class Config(object):
         return self._trigger_script_with_timeout(10, "./impl/on_active.sh", vip, iface)
 
     @returns_minusone_on_Exception
+    def become_clustered(self):
+        return self._trigger_script_with_timeout(10, "./impl/on_clustered.sh")
+
+    @returns_minusone_on_Exception
+    def become_declustered(self):
+        return self._trigger_script_with_timeout(10, "./impl/on_declustered.sh")
+
+    @returns_minusone_on_Exception
     def become_standby_from_active(self):
         vip   = self.get("vip","")
         iface = self.get("iface","")
@@ -95,13 +114,6 @@ class Config(object):
     def trigger_fence(self):
         myid = self.get("id","")
         return self._trigger_script_with_timeout(10, "./impl/on_fence.sh", myid)
-
-    def _check(self):
-        assert self.get("id",False)
-        assert "check_health" in dir(self)
-        assert "become_active" in dir(self)
-        assert "trigger_standby" in dir(self)
-        assert "trigger_fence" in dir(self)
 
     def _trigger_script_with_timeout(self,timeout, fname,*args):
         popen_args = ["/bin/bash",fname]
