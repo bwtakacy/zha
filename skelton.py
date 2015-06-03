@@ -22,24 +22,31 @@ class Config(object):
         returns a specified value if keyname exists, otherwise defaultvalue.
         keyname="id" is REQUIRED to specify zha identity, which MUST be unique among cluster.
         Another keys and default values zha uses are listed in skelton.py.
-    check_health(state): 
-        returns 0 for OK, or another integer for NG and throws no exception.
+    check_health(): 
+        returns integer and throws no exception. Returning value is constructed as below:
+            retvalue = is_healthy_to_be_sby | 2*is_healthy_to_be_act
+        That is, 0 for NG as SBY candicate and also ACT candicate,
+        1 for OK as SBY candicate and NG as ACT candicate,
+        2 for NG as SBY candicate and OK as ACT candicate,
+        3 for OK as both SBY and ACT candicates.
         This method is adviced not to block for a long time so that health monitor thread
         can check multiple times within "health_dms_timeout", which can rescure the situation of
-        ocasional failure of cheak_health(). When invoked with state=1, then do health check for ACT,
-        and with state=2, do healthcheck for SBY.
-    trigger_active() : 
+        ocasional failure of cheak_health(). 
+    become_active() : 
         returns 0 for OK, another integer for NG, and throws no exception.
         This method is invoked when this zha is eligible to become active.
         When this method returns 0, zha considers failover has completed and sets its
         status active, otherwise keeps its status standby. For NG, all cleanup codes for 
-        another zha invoking trigger_active is REQUIRED to be implemented.
-    trigger_standby():
+        another zha invoking become_active is REQUIRED to be implemented.
+        This method SHOULD be reentrant, because some resources becomes already  active
+        before zha starts up.
+    become_standby_from_active():
         returns 0 for OK, another integer for NG, and throws no exception.
         This method is invoked when this process has ceased to be active, such as
         health monitor failure or zookeeper connection problem.
         When this method returns NG, zha considers cleanup should be need for another zha becoming active
         , which will result in being fenced by another zha.
+        Note that zha on startup, this method is not inovoked.
     trigger_fence(): 
         returns 0 for OK, another integer for NG, and throws no exception.
         This methods will be invoked only when this zha is eligible to become active 
@@ -49,7 +56,7 @@ class Config(object):
     """
 
     def __init__(self):
-        self.health_seq = itertools.cycle([0,0,0,1,1,1,0,0,1,0,0,0]) 
+        self.health_seq = itertools.cycle([2,2,2,1,1,1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2]) 
         self.properties = {
                 "id": "hostA",
                 #"connection_string":  "127.0.0.1:2181",
@@ -68,18 +75,18 @@ class Config(object):
         return self.properties.get(key,default)
 
     @returns_minusone_on_Exception
-    def check_health(self, estate):
+    def check_health(self):
         return self.health_seq.next()
         #return self._trigger_script_with_timeout(10, "impl/check_health.sh", estate)
 
     @returns_minusone_on_Exception
-    def trigger_active(self):
+    def become_active(self):
         vip   = self.get("vip","")
         iface = self.get("iface","")
         return self._trigger_script_with_timeout(10, "./impl/on_active.sh", vip, iface)
 
     @returns_minusone_on_Exception
-    def trigger_standby(self):
+    def become_standby_from_active(self):
         vip   = self.get("vip","")
         iface = self.get("iface","")
         return self._trigger_script_with_timeout(10, "./impl/on_standby.sh", vip, iface)
@@ -92,7 +99,7 @@ class Config(object):
     def _check(self):
         assert self.get("id",False)
         assert "check_health" in dir(self)
-        assert "trigger_active" in dir(self)
+        assert "become_active" in dir(self)
         assert "trigger_standby" in dir(self)
         assert "trigger_fence" in dir(self)
 

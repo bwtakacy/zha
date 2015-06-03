@@ -38,28 +38,31 @@ from kazoo.client import KazooState
 from kazoo.exceptions import LockTimeout
 
 class ZHA(object):
+    ACT, SBY = 0, 1
     class HealthStateUpdateCallback(object):
         def __init__(self, zha):
             self.zha = zha
         def on_state_update(self, state):
-            if state == HealthMonitor.OK:
-                self.zha.last_health_ok = time.time()
+            if state & HealthMonitor.ACT_OK == HealthMonitor.ACT_OK:
+                self.zha.last_health_ok_act = time.time()
+            if state & HealthMonitor.SBY_OK == HealthMonitor.SBY_OK:
+                self.zha.last_health_ok_sby = time.time()
             logger.info("ZHA: latest Health state is: %d" %(state))
             self.zha.recheck()
     class ElectorStateChangeCallback(object):
         def __init__(self, zha):
             self.zha = zha
         def on_become_active(self):
-            if self.zha.trigger_active() == 0:
+            if self.zha.become_active() == 0:
                 logger.info("ZHA::ElectorCallback: successfully become active")
-                self.zha.election_state = Elector.ACT
+                self.zha.election_state = ZHA.ACT
                 return True
             else:
                 logger.info("ZHA::ElectorCallback: activation failed..")
                 return False
         def on_become_active_to_standby(self):
-            self.zha.election_state = Elector.SBY # state changed to SBY anyway.
-            if self.zha.trigger_standby() == 0:
+            self.zha.election_state = ZHA.SBY # state changed to SBY anyway.
+            if self.zha.trigger_standby_from_active() == 0:
                 logger.info("ZHA::ElectorCallback: successfully become standby")
                 return True
             else:
@@ -75,27 +78,28 @@ class ZHA(object):
 
     def __init__(self, config):
         self.config = config
-        self.trigger_active  = self._deco_returns_minusone_on_Exception(config.trigger_active)
-        self.trigger_standby = self._deco_returns_minusone_on_Exception(config.trigger_standby)
+        self.become_active  = self._deco_returns_minusone_on_Exception(config.become_active)
+        self.trigger_standby_from_active = self._deco_returns_minusone_on_Exception(config.trigger_standby_from_active)
         self.trigger_fence   = self._deco_returns_minusone_on_Exception(config.trigger_fence)
         self.check_health    = self._deco_returns_minusone_on_Exception(config.check_health)
         self.should_run = True
-        self.last_health_ok = None
-        self.election_state = Elector.SBY
+        self.last_health_ok_act = None
+        self.last_health_ok_sby = None
+        self.election_state = ZHA.SBY
         self.monitor = HealthMonitor(config, self.HealthStateUpdateCallback(self))
         self.elector = Elector(config, self.ElectorStateChangeCallback(self))
         self.monitor.start()
         self.elector.start()
         signal.signal(signal.SIGINT, self.on_sigint)
     def recheck(self):
-        if self.last_health_ok is None:
-            self.elector.leave()
+        if self.last_health_ok_act is None:
+            self.elector.in_entry_act = False
             return
-        if time.time() - self.last_health_ok < self.config.get("health_dms_timeout",10):
-            self.elector.enter()
+        if time.time() - self.last_health_ok_act < self.config.get("health_dms_timeout",10):
+            self.elector.in_entry_act = True
             return
         else: #dms timeout
-            self.elector.leave()
+            self.elector.in_entry_act = False
             return
     def mainloop(self):
         while self.should_run:
@@ -116,16 +120,15 @@ class ZHA(object):
         return func
 
 class HealthMonitor(threading.Thread):
-    OK,NG,INIT = 0,1,2
+    SBY_OK,ACT_OK = 1,2
     def __init__(self, config, callback):
         threading.Thread.__init__(self)
         self.config = config
         self.callback = callback
         self.check_health = self.callback.zha.check_health
-        self.state = HealthMonitor.INIT
         self.should_run = True
     def monitor(self):
-        result = self.check_health(self.callback.zha.election_state)
+        result = self.check_health()
         self.callback.on_state_update(result)
     def run(self):
         while self.should_run:
@@ -140,7 +143,8 @@ class Elector(threading.Thread):
         self.config = config
         self.callback = callback
         self.should_run = True
-        self.in_entry = False
+        self.in_entry_act = False
+        self.in_entry_sby = False
         self.state = Elector.NOLOCK
         self.zk = KazooClient(hosts=self.config.get("connection_string","127.0.0.1:2181"), logger=logger)
         self.zk.add_listener(self.zk_listener)
@@ -148,10 +152,6 @@ class Elector(threading.Thread):
         self.id = self.config.get("id")
         self.lock = self.zk.Lock(self.config.get("lock_znode","/zha-lock"), self.id)
         self.abcpath = self.config.get("abc_znode","/zha-abc")
-    def enter(self):
-        self.in_entry = True
-    def leave(self):
-        self.in_entry = False
     def zk_listener(self,zkstate):
         logger.info("zookeeper connection state changed %s"%(zkstate,) )
         if zkstate == KazooState.LOST:
@@ -200,7 +200,7 @@ class Elector(threading.Thread):
             return
         #for locker
         if self.state == Elector.LOCKING:
-            if self.in_entry is False:
+            if self.in_entry_act is False:
                 self.retire()
                 return
             return
@@ -210,6 +210,9 @@ class Elector(threading.Thread):
         except LockTimeout:
             self.retire()
             logger.info("lock timeout")
+            return
+        if self.in_entry_act is False:
+            self.retire()
             return
         if self.handle_abc() is False:
             self.retire()
