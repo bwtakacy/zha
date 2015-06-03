@@ -67,16 +67,19 @@ class Config(object):
     """
 
     def __init__(self):
-        self.health_seq = itertools.cycle([2,2,2,1,1,1,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2]) 
+        self.health_seq = itertools.cycle([2,2,2,1,1,1,1,1,1,1,1,1,2,2,2,2,2,2,2,2,2]) 
         self.properties = {
                 "id": "hostA",
                 #"connection_string":  "127.0.0.1:2181",
                 #"lock_znode":         "/zha-lock",
                 #"abc_znode":          "/zha-abc",
-                #"recheck_interval":   5,
-                #"healthcheck_interval":5,
+                #"cluster_znode":      "/zha-state",
+                #"clustercheck_interval":   3,
+                #"healthcheck_interval":    5,
                 #"elector_interval":   3,
+
                 #"health_dms_timeout":   10,
+                #"cluster_dms_timeout":   10,
 
                 "vip":                  "127.0.0.2/8",
                 "iface":                "lo"
