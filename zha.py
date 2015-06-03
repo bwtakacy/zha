@@ -134,14 +134,14 @@ class HealthMonitor(threading.Thread):
         logger.info("monitor thread stopped.")
 
 class Elector(threading.Thread):
-    ACT, SBY = 1,2
+    LOCKING, NOLOCK = 1,2
     def __init__(self, config, callback):
         threading.Thread.__init__(self)
         self.config = config
         self.callback = callback
         self.should_run = True
         self.in_entry = False
-        self.state = Elector.SBY
+        self.state = Elector.NOLOCK
         self.zk = KazooClient(hosts=self.config.get("connection_string","127.0.0.1:2181"), logger=logger)
         self.zk.add_listener(self.zk_listener)
         self.zk.start()
@@ -156,11 +156,11 @@ class Elector(threading.Thread):
         logger.info("zookeeper connection state changed %s"%(zkstate,) )
         if zkstate == KazooState.LOST:
             logger.info("(connection to zookeeper is lost/closed)")
-            if self.state != Elector.ACT:
+            if self.state != Elector.LOCKING:
                 return
             logger.info("become standby due to zk connection problem.")
             self.callback.on_become_active_to_standby()
-            self.state = Elector.SBY
+            self.state = Elector.NOLOCK
         elif zkstate == KazooState.SUSPENDED:
             return
         else:
@@ -186,24 +186,25 @@ class Elector(threading.Thread):
         except:
             return False
     def retire(self):
-        if self.state == Elector.ACT:
+        if self.state == Elector.LOCKING:
             if self.callback.on_become_active_to_standby():
                 self.zk_delete_my_abc() #dont care it succeeds or not.
             else:
                 pass #,that is, become standby leaving abc behind.
-        self.state = Elector.SBY
+        self.state = Elector.NOLOCK
         self.lock.release()
     def in_elector_loop(self):
         if self.zk.state != KazooState.CONNECTED:
             # zk listener will callback on LOST, so no need to call self.retire(),
             # but it takes a bit long to be LOST. Mostly other zha will fence me.
             return
-        if self.in_entry is False:
-            self.retire()
+        #for locker
+        if self.state == Elector.LOCKING:
+            if self.in_entry is False:
+                self.retire()
+                return
             return
-        if self.state == Elector.ACT:
-            return
-        assert self.in_entry is True and self.state == Elector.SBY
+        #for waiters 
         try:
             lock_result = self.lock.acquire(timeout=self.config.get("elector_interval",3))
         except LockTimeout:
@@ -218,7 +219,7 @@ class Elector(threading.Thread):
             self.retire()
             return
         # if reached here, all done with lock
-        self.state = Elector.ACT
+        self.state = Elector.LOCKING
     def run(self):
         while self.should_run:
             self.in_elector_loop()
