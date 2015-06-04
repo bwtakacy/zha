@@ -67,7 +67,7 @@ class Config(object):
     """
 
     def __init__(self):
-        self.health_seq = itertools.cycle([2,2,2,1,1,1,1,1,1,1,1,1,2,2,2,2,2,2,2,2,2]) 
+        self.health_seq = itertools.cycle([2,2,2,1,1,1,2,2,2,1,2,]) 
         self.properties = {
                 "id": "hostA",
                 #"connection_string":  "127.0.0.1:2181",

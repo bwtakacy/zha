@@ -44,7 +44,7 @@ class ZHA(object):
         #state
         self.last_health_ok_act = None
         self.last_health_ok_sby = None
-        self.state = "INIT:UNKNOWN"
+        self.state = "SBY:UNKNOWN"
         self.is_clustered = False
         #threads
         self.hmonitor = HealthMonitor(self)
@@ -59,7 +59,9 @@ class ZHA(object):
         for th in threads:
             th.start()
         while self.should_run:
-            time.sleep(1) #self.recheck() is invoked by monitors
+            now = time.time()
+            logging.info("State: %s isClustered: %s"%(self.state, self.is_clustered) )
+            time.sleep(3) #self.recheck() is invoked by monitors
         for th in threads:
             th.should_run = False
         for th in threads:
@@ -88,11 +90,11 @@ class ZHA(object):
         elif time.time() - self.last_health_ok_sby < self.config.get("health_dms_timeout",10):
             self.elector.in_entry_sby = True
             if mode == "SBY":
-                self.set_state("SBY:HEALTY")
+                self.set_state("SBY:HEALTHY")
         else: #dms timeout
             self.elector.in_entry_sby = False
             if mode == "SBY":
-                self.set_state("SBY:UNHEALTY")
+                self.set_state("SBY:UNHEALTHY")
 
 class HealthMonitor(threading.Thread):
     """periodically checks resource health. This changes ZHA.last_health_ok_act/sby"""
@@ -107,7 +109,7 @@ class HealthMonitor(threading.Thread):
             self.zha.last_health_ok_act = time.time()
         if state & HealthMonitor.SBY_OK == HealthMonitor.SBY_OK:
             self.zha.last_health_ok_sby = time.time()
-        logger.info("ZHA: latest Health state is: %d" %(state))
+        logger.debug("ZHA: latest Health state is: %d" %(state))
         self.zha.recheck()
     def run(self):
         while self.should_run:
@@ -127,38 +129,40 @@ class ClusterMonitor(threading.Thread):
         self.zroot = self.zha.config.get("cluster_znode","/zha-state")
         self.znode = self.zroot + "/" + self.zha.config.get("id") 
         self._zk_register()
-        self.is_not_alone = False
+        self.not_alone = None
     def run(self):
         while self.should_run:
-            self.zk.set(self.znode, self.zha.state)
+            time.sleep(self.zha.config.get("clustercheck_interval",3))
+            self.zk.retry(self.zk.set, self.znode, self.zha.state)
             self.check_cluster()
             self.trigger()
             self.zha.recheck()
-            time.sleep(self.zha.config.get("clustercheck_interval",3))
+        self.zk.retry(self.zk.delete, self.znode)
         logger.info("cluster monitor thread stopped.")
     def check_cluster(self):
         count = 0
-        chs = self.zk.get_children(self.zroot)
+        chs = self.zk.retry(self.zk.get_children, self.zroot)
         for ch in chs:
-            data, stats = self.zk.get(self.zroot+"/"+ch)
-            if data.strip()=="SBY:HEALTY":
+            data, stats = self.zk.retry(self.zk.get, self.zroot+"/"+ch)
+            if data.strip()=="SBY:HEALTHY":
                 count += 1
         if count != 0:
             self.not_alone = time.time()
+        logger.debug("healthy sbys: %d"%(count,))
     def trigger(self):
-        if self.zha.state != "ACT:HEALTY":
+        if self.zha.state != "ACT:HEALTHY":
             return
         if self.zha.is_clustered:
             if time.time()-self.not_alone > self.zha.config.get("cluster_dms_timeout",10):
                 self.zha.config.become_declustered()
-                self.is_clustered = False
+                self.zha.is_clustered = False
                 return
         elif self.zha.is_clustered is False:
             if self.not_alone is None:
                 return
             if time.time()-self.not_alone < self.zha.config.get("cluster_dms_timeout",10):
                 self.zha.config.become_clustered()
-                self.is_clustered = True
+                self.zha.is_clustered = True
                 return
     def _zk_listener(self,zkstate):
         logger.info("zookeeper connection state changed %s"%(zkstate,) )
@@ -170,12 +174,12 @@ class ClusterMonitor(threading.Thread):
             return
     def _zk_register(self):
         #register my ephemeral znode
-        if not self.zk.exists(self.zroot):
-            self.zk.create(self.zroot,"",makepath=True)
+        if not self.zk.retry(self.zk.exists, self.zroot):
+            self.zk.retry(self.zk.create, self.zroot,"",makepath=True)
         if self.zk.exists(self.znode):
-            self.zk.set(self.znode,self.zha.state)
+            self.zk.retry(self.zk.set, self.znode, self.zha.state)
         else:
-            self.zk.create(self.znode,self.zha.state, ephemeral=True)
+            self.zk.retry(self.zk.create, self.znode,self.zha.state, ephemeral=True)
 
 class Elector(threading.Thread):
     LOCKING, NOLOCK = 1,2
