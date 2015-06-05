@@ -10,7 +10,6 @@ This project is WIP, no stable release yet.
 
 - Small and Handy
 - Well documented
-- Customizable
 
 ## Install
 
@@ -29,6 +28,10 @@ standalone program to use zha.
 ## LICENCE
 
 BSD, as embedded in `zha.py`
+
+## Releases
+
+- 2015/06/05: ver 0.1.0. This is a beta release.
 
 ## What zha supports
 
@@ -125,8 +128,6 @@ trigger_fence():
     AND the previous active zha is not did not cleanly retire 
     AND the previous active zha is not this zha.
     This SHOULD always succeed, otherwise this zha stops failover.
-
-Belows are possible state transisiton zha assumes. each state has its eligility
-    SBY <--> ACT(DECLUSTED) <---> ACT(CLUSTERED)
 ```
+
 
