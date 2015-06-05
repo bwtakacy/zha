@@ -5,12 +5,25 @@ import itertools
 import subprocess
 import time
 
+from functools import wraps
 def returns_minusone_on_Exception(orig_func):
+    @wraps(orig_func)
     def func(*args,**kwards):
         try:
             ret = orig_func(*args,**kwards)
         except Exception, e:
             ret = -1
+            print e
+        return ret
+    return func
+
+def returns_zero_on_Exception(orig_func):
+    @wraps(orig_func)
+    def func(*args,**kwards):
+        try:
+            ret = orig_func(*args,**kwards)
+        except Exception, e:
+            ret = 0
             print e
         return ret
     return func
@@ -61,9 +74,6 @@ class Config(object):
         AND the previous active zha is not did not cleanly retire 
         AND the previous active zha is not this zha.
         This SHOULD always succeed, otherwise this zha stops failover.
-    
-    Belows are possible state transisiton zha assumes. each state has its eligility
-        SBY <--> ACT(DECLUSTED) <---> ACT(CLUSTERED)
     """
 
     def __init__(self):
@@ -77,27 +87,21 @@ class Config(object):
                 #"clustercheck_interval":   3,
                 #"healthcheck_interval":    5,
                 #"elector_interval":   3,
-
                 #"health_dms_timeout":   10,
                 #"cluster_dms_timeout":   10,
-
-                "vip":                  "127.0.0.2/8",
-                "iface":                "lo"
         }
 
     def get(self,key,default=None):
         return self.properties.get(key,default)
 
-    @returns_minusone_on_Exception
+    @returns_zero_on_Exception
     def check_health(self):
-        return self.health_seq.next()
-        #return self._trigger_script_with_timeout(10, "impl/check_health.sh", estate)
+        #return self.health_seq.next()
+        return self._trigger_script_with_timeout(10, "impl/check_health.sh")
 
     @returns_minusone_on_Exception
     def become_active(self):
-        vip   = self.get("vip","")
-        iface = self.get("iface","")
-        return self._trigger_script_with_timeout(10, "./impl/on_active.sh", vip, iface)
+        return self._trigger_script_with_timeout(10, "./impl/on_active.sh")
 
     @returns_minusone_on_Exception
     def become_clustered(self):
@@ -109,14 +113,12 @@ class Config(object):
 
     @returns_minusone_on_Exception
     def become_standby_from_active(self):
-        vip   = self.get("vip","")
-        iface = self.get("iface","")
-        return self._trigger_script_with_timeout(10, "./impl/on_standby.sh", vip, iface)
+        return self._trigger_script_with_timeout(10, "./impl/on_standby.sh")
 
     @returns_minusone_on_Exception
     def trigger_fence(self):
         myid = self.get("id","")
-        return self._trigger_script_with_timeout(10, "./impl/on_fence.sh", myid)
+        return self._trigger_script_with_timeout(10, "./impl/on_fence.sh")
 
     def _trigger_script_with_timeout(self,timeout, fname,*args):
         popen_args = ["/bin/bash",fname]
