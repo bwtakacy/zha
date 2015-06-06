@@ -2,13 +2,13 @@
 
 `zha` is a small python library that delivers high availability to an arbitary
 program.  `zha` leverages Apache ZooKeeper and its python bindings kazoo, and is
-inspired from Apache Hadoop (ZKFC).
+inspired from Apache Hadoop (HDFS ZKFC).
 
 This project is WIP, no stable release yet.
 
 ## Concepts
 
-- Small and Handy
+- Small and Handy (~300 lines of code)
 - Well documented
 
 ## Install
@@ -17,6 +17,7 @@ This project is WIP, no stable release yet.
 
 ```
 sudo pip install kazoo
+sudo pip six --upgrade
 ```
 
 ## Usage
@@ -32,6 +33,10 @@ BSD, as embedded in `zha.py`
 ## Releases
 
 - 2015/06/05: ver 0.1.0. This is a beta release.
+
+## Articles
+
+- http://qiita.com/sakamotomsh/items/c073bb662cff1c00decc
 
 ## What zha supports
 
@@ -80,8 +85,8 @@ z = zha.ZHA(Config())
 z.mainloop() # Ctrl+C to stops
 ```
 
-Users inform zha of system information via defining `Config` class.
-So `zha` defines `Config` class interface. It is well documented in the
+`zha` defines `Config` class interface. Users need to inform zha of system 
+information via defining `Config` class. It is well documented in the
 `skelton.py`. Below is an extraction:
 
 ```
@@ -130,4 +135,7 @@ trigger_fence():
     This SHOULD always succeed, otherwise this zha stops failover.
 ```
 
+## skelton.py
+
+With `skelton.py`, you can write a callback above with shell script or any language.
 
