@@ -23,22 +23,18 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
-
-import threading
-import time
-import signal
-
 import logging
 FORMAT = '%(asctime)-15s %(message)s'
 logging.basicConfig(format=FORMAT, level=logging.INFO)
 logger = logging.getLogger('zha')
-
+import threading
+import time
+import signal
 from kazoo.client import KazooClient
 from kazoo.client import KazooState
 from kazoo.exceptions import LockTimeout
 
 class ZHA(object):
-    ACT, SBY = 0, 1
     def __init__(self, config):
         self.config = config
         #state
@@ -61,7 +57,7 @@ class ZHA(object):
         while self.should_run:
             now = time.time()
             logging.info("State: %s isClustered: %s"%(self.state, self.is_clustered) )
-            time.sleep(3) #self.recheck() is invoked by monitors
+            time.sleep(3) #recheck() is invoked by monitors
         for th in threads:
             th.should_run = False
         for th in threads:
@@ -118,7 +114,8 @@ class HealthMonitor(threading.Thread):
         logger.info("health monitor thread stopped.")
 
 class ClusterMonitor(threading.Thread):
-    """periodically checks cluster member."""
+    """periodically checks cluster member.
+    This class is delegated to change state between ACT clustered and ACT declustered."""
     def __init__(self, zha):
         threading.Thread.__init__(self)
         self.zha = zha
@@ -133,10 +130,10 @@ class ClusterMonitor(threading.Thread):
     def run(self):
         while self.should_run:
             time.sleep(self.zha.config.get("clustercheck_interval",3))
+            self.zha.recheck()
             self.zk.retry(self.zk.set, self.znode, self.zha.state)
             self.check_cluster()
             self.trigger()
-            self.zha.recheck()
         self.zk.retry(self.zk.delete, self.znode)
         logger.info("cluster monitor thread stopped.")
     def check_cluster(self):
@@ -281,9 +278,7 @@ class Elector(threading.Thread):
     def retire(self):
         if self.state == Elector.LOCKING:
             if self.on_become_active_to_standby():
-                self.zk_delete_my_abc() #dont care it succeeds or not.
-            else:
-                pass #,that is, become standby leaving abc behind.
+                self.zk_delete_my_abc() #dont care it succeeds or not, that is, may become standby leaving abc behind.
         self.state = Elector.NOLOCK
         self.lock.release()
 
