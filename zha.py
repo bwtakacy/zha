@@ -141,7 +141,7 @@ class ClusterMonitor(threading.Thread):
         chs = self.zk.retry(self.zk.get_children, self.zroot)
         for ch in chs:
             data, stats = self.zk.retry(self.zk.get, self.zroot+"/"+ch)
-            if data.strip()=="SBY:HEALTHY":
+            if data.strip()=="SBY:HEALTHY" and ch != self.zha.config.get("id"):
                 count += 1
         if count != 0:
             self.not_alone = time.time()
