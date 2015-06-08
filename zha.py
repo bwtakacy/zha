@@ -38,8 +38,8 @@ class ZHA(object):
     def __init__(self, config):
         self.config = config
         #state
-        self.last_health_ok_act = None
-        self.last_health_ok_sby = None
+        self.last_health_ok_act = 0
+        self.last_health_ok_sby = 0
         self.state = "SBY:UNKNOWN"
         self.is_clustered = False
         #threads
@@ -56,22 +56,34 @@ class ZHA(object):
             th.start()
         while self.should_run:
             now = time.time()
-            logging.info("State: %s isClustered: %s"%(self.state, self.is_clustered) )
+            self.report_status()
             time.sleep(3) #recheck() is invoked by monitors
         for th in threads:
             th.should_run = False
         for th in threads:
             th.join()
         logger.info("ZHA: main thread stopped.")
+    def report_status(self):
+        report_str = ""
+        #state
+        if self.is_clustered: report_str += "State=("+self.state+":CLUSTERED)"
+        else:                 report_str += "State=("+self.state+":DECLUSTERED)"
+        #health
+        ttl_act = max([0, int(self.config.get("health_dms_timeout",10)-time.time()+self.last_health_ok_act)])
+        ttl_sby = max([0, int(self.config.get("health_dms_timeout",10)-time.time()+self.last_health_ok_sby)])
+        report_str += " TTL=(%d,%d)"%(ttl_act,ttl_sby)
+        report_str += " Threads=("
+        for th in [self.hmonitor, self.cmonitor, self.elector]:
+            if th.is_alive(): report_str += "ON,"
+            else            : report_str += "OFF,"
+        report_str += ")"
+
+        logging.info(report_str)
     def set_state(self, state):
         self.state = state
     def recheck(self):
         mode = self.state.split(":")[0]
-        if self.last_health_ok_act is None:
-            self.elector.in_entry_act = False
-            if mode == "ACT":
-                self.set_state("ACT:UNKNOWN")
-        elif time.time() - self.last_health_ok_act < self.config.get("health_dms_timeout",10):
+        if time.time() - self.last_health_ok_act < self.config.get("health_dms_timeout",10):
             self.elector.in_entry_act = True
             if mode == "ACT":
                 self.set_state("ACT:HEALTHY")
@@ -79,11 +91,7 @@ class ZHA(object):
             self.elector.in_entry_act = False
             if mode == "ACT":
                 self.set_state("ACT:UNHEALTHY")
-        if self.last_health_ok_sby is None:
-            self.elector.in_entry_sby = False
-            if mode == "SBY":
-                self.set_state("SBY:UNKNOWN")
-        elif time.time() - self.last_health_ok_sby < self.config.get("health_dms_timeout",10):
+        if time.time() - self.last_health_ok_sby < self.config.get("health_dms_timeout",10):
             self.elector.in_entry_sby = True
             if mode == "SBY":
                 self.set_state("SBY:HEALTHY")
