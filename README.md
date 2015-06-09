@@ -1,8 +1,13 @@
 # zha
 
-`zha` is a small python library that delivers high availability to an arbitary
-program.  `zha` leverages Apache ZooKeeper and its python bindings kazoo, and is
+Zha is a small python library that delivers high availability to an arbitary
+program.  Zha leverages Apache ZooKeeper and its python bindings kazoo, and is
 inspired from Apache Hadoop (HDFS ZKFC).
+
+Not familiar with python? No problem. Zha provides skelton program `skelton.py`,
+which by default all callbacks you need to implement are implemented 
+as invoking shell scripts, such as `impl/check_health.sh` etc. 
+So with `skelton.py`, you can write callbacks with shell script or any language you want.
 
 This project is WIP, no stable release yet.
 
@@ -13,18 +18,18 @@ This project is WIP, no stable release yet.
 
 ## Install
 
-`zha` is a single file `zha.py`. So all you need is install dependencies, that is, kazoo
+Zha is a single file `zha.py`. So all you need is install dependencies, that is, kazoo
 
 ```
 sudo pip install kazoo
-sudo pip six --upgrade
+sudo pip install six --upgrade
 ```
 
 ## Usage
 
 Modify `skelton.py` for your need, type `python skelton.py` to start, and press
 `Ctrl+C` or send SIGINT to stop.  See `skelton.py` for details. This is a
-standalone program to use zha.
+standalone program to use zha. For more details, see "skelton.py".
 
 ## LICENCE
 
@@ -38,7 +43,7 @@ BSD, as embedded in `zha.py`
 
 - http://qiita.com/sakamotomsh/items/c073bb662cff1c00decc
 
-## What zha supports
+## What zha provides
 
 High availability cluster consists of one active process (ACT) and multiple
 standby processes (SBYs). When ACT faults, one of SBYs is selected as a new ACT
@@ -61,7 +66,7 @@ failover, `zha` call it back on lock acquitition.
 
 ### Health monitoring
 ACT should retire when its resource becomes unhealthy. SBY should stop trying
-to lock. `zha` supports this. 
+to lock. `zha` provides this feature.
 
 ### Triggering failover
 Failover sequecnce has two phases. One is for ACT and the other is for a new
@@ -73,8 +78,6 @@ avoinding nightmare situation, split-brain. After that, new ACT candicate
 takes over the role, which includes attaching VIP and broadcast garp.
 
 ## zha API summary
-Zha helps lockholder selection, health monitoring, and triggering failover.
-Users have to inform zha how to do that. This section shows howto. 
 
 Typical usage of zha is as follows: a) define config class, b) create `zha.ZHA` instance,
 c) call `mainloop()`.
@@ -85,9 +88,8 @@ z = zha.ZHA(Config())
 z.mainloop() # Ctrl+C to stops
 ```
 
-`zha` defines `Config` class interface. Users need to inform zha of system 
-information via defining `Config` class. It is well documented in the
-`skelton.py`. Below is an extraction:
+Users need to inform zha how to react to events by implementing callbacks to `Config` class.
+Callbacks specification is well documented in the `skelton.py`,as extracted below:
 
 ```
 get(keyname, defaultvalue): 
@@ -134,8 +136,4 @@ trigger_fence():
     AND the previous active zha is not this zha.
     This SHOULD always succeed, otherwise this zha stops failover.
 ```
-
-## skelton.py
-
-With `skelton.py`, you can write a callback above with shell script or any language.
 
