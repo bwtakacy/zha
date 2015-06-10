@@ -138,3 +138,23 @@ trigger_fence():
     This SHOULD always succeed, otherwise this zha stops failover.
 ```
 
+
+## Administration
+
+### Check zha is working
+You can check zha status by its stdout. Every 3 seconds status report
+will be reported as follows::
+
+   State=(ACT:HEALTHY:DECLUSTERED) TTL=(8,8) Threads=(ON,ON,ON,) 
+
+State consists of 3 terms seperated by ":". First means ACT or SBY,
+Second means its health state, and the last means cluster state (which is 
+meaningless when not ACT). TTL consists of 2 integer, which means its
+TTL for health check for eligility for ACT and SBY. HealthcheckMonitor
+periodically check its resource state and updates its TTL to `health_dms_timeout`
+when it is eligible to be ACT/SBY. When its value reaches to zero,
+zha considers its ACT/SBY health check fails. This type of healthcheck is
+Deadman's Switch(DMS) typed healthcheck. OK, Thread part consists of
+3 part of whose value is ON or OFF. which represents zha's internal three threads
+healthmonitor, clustormonitor, elector is running or not.
+
