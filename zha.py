@@ -30,6 +30,7 @@ logger = logging.getLogger('zha')
 import threading
 import time
 import signal
+import sys
 from kazoo.client import KazooClient
 from kazoo.client import KazooState
 from kazoo.exceptions import LockTimeout
@@ -179,6 +180,9 @@ class ClusterMonitor(threading.Thread):
             return
     def _zk_register(self):
         #register my ephemeral znode
+        if self.zk.retry(self.zk.exists, self.znode):
+            logger.error("Same name zha seems to exist already, Exit.")
+            sys.exit(1)
         if not self.zk.retry(self.zk.exists, self.zroot):
             self.zk.retry(self.zk.create, self.zroot,"",makepath=True)
         if self.zk.exists(self.znode):
