@@ -5,8 +5,8 @@ program.  Zha leverages Apache ZooKeeper and its python bindings kazoo, and is
 inspired from Apache Hadoop (HDFS ZKFC).
 
 Not familiar with python? No problem. Zha provides skelton program `skelton.py`,
-which by default all callbacks you need to implement are implemented 
-as invoking shell scripts, such as `impl/check_health.sh` etc. 
+which by default all callbacks you need to implement are already implemented
+as invoking shell scripts, such as `impl/check_health.sh` etc.
 So with `skelton.py`, you can write callbacks with shell script or any language you want.
 
 This project is WIP, no stable release yet.

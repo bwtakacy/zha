@@ -24,8 +24,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 import logging
-FORMAT = '%(asctime)-15s %(message)s'
-logging.basicConfig(format=FORMAT, level=logging.INFO)
+logging.basicConfig(format='%(asctime)-15s %(message)s', level=logging.INFO)
 logger = logging.getLogger('zha')
 import threading
 import time
@@ -74,12 +73,18 @@ class ZHA(object):
         ttl_sby = max([0, int(self.config.get("health_dms_timeout",10)-time.time()+self.last_health_ok_sby)])
         report_str += " TTL=(%d,%d)"%(ttl_act,ttl_sby)
         report_str += " Threads=("
+        is_ok = True
         for th in [self.hmonitor, self.cmonitor, self.elector]:
-            if th.is_alive(): report_str += "ON,"
-            else            : report_str += "OFF,"
+            if th.is_alive():
+                report_str += "ON,"
+            else:
+                report_str += "OFF,"
+                is_ok = False
         report_str += ")"
-
         logging.info(report_str)
+        if is_ok is False:
+            logger.error("monitor/elector thread ended unexpectedly. Exit")
+            sys.exit(1)
     def set_state(self, state):
         self.state = state
     def recheck(self):
