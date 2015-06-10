@@ -23,13 +23,17 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
+
+__version__ = '0.1.1'
 import logging
 logging.basicConfig(format='%(asctime)-15s %(message)s', level=logging.INFO)
 logger = logging.getLogger('zha')
-import threading
-import time
+
 import signal
 import sys
+import threading
+import time
+
 from kazoo.client import KazooClient
 from kazoo.client import KazooState
 from kazoo.exceptions import LockTimeout

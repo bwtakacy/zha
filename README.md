@@ -37,6 +37,7 @@ BSD, as embedded in `zha.py`
 
 ## Releases
 
+- 2015/06/10: ver 0.1.1. RC release.
 - 2015/06/05: ver 0.1.0. This is a beta release.
 
 ## Articles
