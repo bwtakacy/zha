@@ -30,6 +30,7 @@ sudo pip install six --upgrade
 Modify `skelton.py` for your need, type `python skelton.py` to start, and press
 `Ctrl+C` or send SIGINT to stop.  See `skelton.py` for details. This is a
 standalone program to use zha. For more details, see "skelton.py".
+It is noted that "id" is required to be varied for each zha instances.
 
 ## LICENCE
 
@@ -138,14 +139,19 @@ trigger_fence():
     This SHOULD always succeed, otherwise this zha stops failover.
 ```
 
+## Configuration
+
+TBW.
 
 ## Administration
 
 ### Check zha is working
 You can check zha status by its stdout. Every 3 seconds status report
-will be reported as follows::
+will be reported as follows
 
-   State=(ACT:HEALTHY:DECLUSTERED) TTL=(8,8) Threads=(ON,ON,ON,) 
+```
+State=(ACT:HEALTHY:DECLUSTERED) TTL=(8,8) Threads=(ON,ON,ON,) 
+```
 
 State consists of 3 terms seperated by ":". First means ACT or SBY,
 Second means its health state, and the last means cluster state (which is 
@@ -157,4 +163,13 @@ zha considers its ACT/SBY health check fails. This type of healthcheck is
 Deadman's Switch(DMS) typed healthcheck. OK, Thread part consists of
 3 part of whose value is ON or OFF. which represents zha's internal three threads
 healthmonitor, clustormonitor, elector is running or not.
+
+### Stop zha without any interference
+When you stops zha, ACT zha tries to retire, that is, ceases to be ACT.
+Similaly, when you stops SBY zha, ACT zha detects SBY zha stopping, 
+resulting in invoking `on_declustred`.
+
+Sometimes you want to stop monitoring, that is, stop all zhas without
+invoking any callbacks. It is possible by a) sending SIGKILL to all zha
+at once, and b) deleting `abc_znode` by zkcli. 
 
