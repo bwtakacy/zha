@@ -139,7 +139,7 @@ trigger_fence():
     This SHOULD always succeed, otherwise this zha stops failover.
 ```
 
-![StateMachine] (img/StateMachine.png)
+![StateMachine] (doc/StateMachine.png)
 
 ## Configuration
 
