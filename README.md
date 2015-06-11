@@ -139,6 +139,8 @@ trigger_fence():
     This SHOULD always succeed, otherwise this zha stops failover.
 ```
 
+![StateMachine] (img/StateMachine.png)
+
 ## Configuration
 
 TBW.
