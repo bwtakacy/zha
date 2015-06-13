@@ -1,7 +1,6 @@
 #!/bin/env python
 import zha
 import os
-import itertools
 import subprocess
 import time
 
@@ -77,7 +76,6 @@ class Config(object):
     """
 
     def __init__(self):
-        self.health_seq = itertools.cycle([2,2,2,1,1,1,2,2,2,1,2,]) 
         self.properties = {
                 "id": "hostA",
                 #"connection_string":  "127.0.0.1:2181",
@@ -96,7 +94,6 @@ class Config(object):
 
     @returns_zero_on_Exception
     def check_health(self):
-        #return self.health_seq.next()
         return self._trigger_script_with_timeout(10, "impl/check_health.sh")
 
     @returns_minusone_on_Exception
@@ -117,7 +114,6 @@ class Config(object):
 
     @returns_minusone_on_Exception
     def trigger_fence(self):
-        myid = self.get("id","")
         return self._trigger_script_with_timeout(10, "./impl/on_fence.sh")
 
     def _trigger_script_with_timeout(self,timeout, fname,*args):

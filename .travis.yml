@@ -2,19 +2,19 @@ language: python
 python:
   - "2.7"
 install: 
+  - wget http://archive.cloudera.com/cdh4/one-click-install/precise/amd64/cdh4-repository_1.0_all.deb
+  - sudo dpkg -i cdh4-repository_1.0_all.deb
+  - curl -s http://archive.cloudera.com/cdh4/ubuntu/precise/amd64/cdh/archive.key | sudo apt-key add -
   - pip install kazoo
   - pip install six --upgrade
   - sudo apt-get update -q
   - sudo apt-get install openjdk-7-jre
   - sudo apt-get install zookeeper zookeeper-server
-  - wget http://archive.cloudera.com/cdh4/one-click-install/precise/amd64/cdh4-repository_1.0_all.deb
-  - sudo dpkg -i cdh4-repository_1.0_all.deb
-  - curl -s http://archive.cloudera.com/cdh4/ubuntu/precise/amd64/cdh/archive.key | sudo apt-key add -
 before_script:
   - sudo service zookeeper-server init
   - sudo service zookeeper-server start
   - sleep 10
 script:
-  - echo hello
+  - py.test
 after_script:
   - echo good bye

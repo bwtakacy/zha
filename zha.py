@@ -53,6 +53,8 @@ class ZHA(object):
         signal.signal(signal.SIGINT, self.on_sigint)
     def on_sigint(self,sig,frm):
         self.should_run = False
+    def stop(self):
+        self.should_run = False
     def mainloop(self):
         self.should_run = True
         threads = [self.hmonitor, self.cmonitor, self.elector]

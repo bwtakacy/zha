@@ -1,2 +1,2 @@
 *.pyc
-test_*
+__pycache__
