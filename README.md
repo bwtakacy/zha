@@ -1,4 +1,4 @@
-# zha
+# zha ![buildstatus] (https://travis-ci.org/sakamotomsh/zha.svg)
 
 Zha is a small python library that delivers high availability to an arbitary
 program.  Zha leverages Apache ZooKeeper and its python bindings kazoo, and is
