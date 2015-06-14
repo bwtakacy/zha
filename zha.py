@@ -51,6 +51,7 @@ class ZHA(object):
         self.cmonitor = ClusterMonitor(self)
         self.elector = Elector(self)
         signal.signal(signal.SIGINT, self.on_sigint)
+        self.retcode = 0
     def on_sigint(self,sig,frm):
         self.should_run = False
     def stop(self):
@@ -64,14 +65,15 @@ class ZHA(object):
             now = time.time()
             self.report_status()
             time.sleep(3) #recheck() is invoked by monitors
-        self._exit(0)
-    def _exit(self,retcode):
+        self._finalize()
+        return self.retcode
+    def _finalize(self):
+        self.should_run = False
         for th in self.threads:
             th.should_run = False
         for th in self.threads:
             th.join()
         logger.info("ZHA: main thread stopped.")
-        return retcode
     def report_status(self):
         report_str = ""
         #state
@@ -93,7 +95,8 @@ class ZHA(object):
         logging.info(report_str)
         if is_ok is False:
             logger.error("monitor/elector thread ended unexpectedly. Exit")
-            self._exit(1)
+            self.retcode = 1
+            self._finalize()
         return report_str
     def set_state(self, state):
         self.state = state

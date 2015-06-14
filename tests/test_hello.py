@@ -164,7 +164,7 @@ def test_fail_fence():
     subprocess.call("zookeeper-client delete /zha-abc",shell=True)
     time.sleep(10)
 
-def test_unexpected_exception(self):
+def test_unexpected_exception():
     def _ch():
         raise Exception("")
     def _oa():
