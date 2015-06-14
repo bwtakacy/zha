@@ -5,15 +5,15 @@ program.  Zha leverages Apache ZooKeeper and its python bindings kazoo, and is
 inspired from Apache Hadoop (HDFS ZKFC).
 
 Not familiar with python? No problem. Zha provides skelton program `skelton.py`,
-which by default all callbacks you need to implement are already implemented
-as invoking shell scripts, such as `impl/check_health.sh` etc.
-So with `skelton.py`, you can write callbacks with shell script or any language you want.
+in which all callbacks are already implemented as invoking shell scripts.
+So with `skelton.py`, you can realize high availavility with any languages.
 
 This project is WIP, no stable release yet.
 
 ## Concepts
 
 - Small and Handy (~300 lines of code)
+- Well tested
 - Well documented
 
 ## Install
@@ -24,13 +24,6 @@ Zha is a single file `zha.py`. So all you need is install dependencies, that is,
 sudo pip install kazoo
 sudo pip install six --upgrade
 ```
-
-## Usage
-
-Modify `skelton.py` for your need, type `python skelton.py` to start, and press
-`Ctrl+C` or send SIGINT to stop.  See `skelton.py` for details. This is a
-standalone program to use zha. For more details, see "skelton.py".
-It is noted that "id" is required to be varied for each zha instances.
 
 ## LICENCE
 
@@ -79,7 +72,7 @@ cleanly and if not, performs STONITH (shoot the other node in the head) for
 avoinding nightmare situation, split-brain. After that, new ACT candicate
 takes over the role, which includes attaching VIP and broadcast garp.
 
-## zha API summary
+## Usage
 
 Typical usage of zha is as follows: a) define config class, b) create `zha.ZHA` instance,
 c) call `mainloop()`.
@@ -90,8 +83,9 @@ z = zha.ZHA(Config())
 z.mainloop() # Ctrl+C to stops
 ```
 
-Users need to inform zha how to react to events by implementing callbacks to `Config` class.
-Callbacks specification is well documented in the `skelton.py`,as extracted below:
+Users need to inform zha how to react to events by implementing callbacks to
+`Config` class.  Callbacks specification is well documented in the
+`skelton.py`,as extracted below:
 
 ```
 get(keyname, defaultvalue): 
