@@ -90,7 +90,7 @@ class ZHA(object):
         logging.info(report_str)
         if is_ok is False:
             logger.error("monitor/elector thread ended unexpectedly. Exit")
-            sys.exit(1)
+            raise Exception("monitor/elector thread ended unexpectedly. Exit")
     def set_state(self, state):
         self.state = state
     def recheck(self):
@@ -193,7 +193,7 @@ class ClusterMonitor(threading.Thread):
         #register my ephemeral znode
         if self.zk.retry(self.zk.exists, self.znode):
             logger.error("Same name zha seems to exist already, Exit.")
-            sys.exit(1)
+            raise Exception("Same name zha seems to exist already, Exit.")
         if not self.zk.retry(self.zk.exists, self.zroot):
             self.zk.retry(self.zk.create, self.zroot,"",makepath=True)
         if self.zk.exists(self.znode):
@@ -313,7 +313,7 @@ class Elector(threading.Thread):
         if data.strip()==self.id:
             return True
         else:
-            if self.zha.config.on_fence() is False:
+            if self.on_fence() is False:
                 return False
             self.zk.retry(self.zk.set, self.abcpath, self.id)
         return True
