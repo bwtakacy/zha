@@ -57,18 +57,21 @@ class ZHA(object):
         self.should_run = False
     def mainloop(self):
         self.should_run = True
-        threads = [self.hmonitor, self.cmonitor, self.elector]
-        for th in threads:
+        self.threads = [self.hmonitor, self.cmonitor, self.elector]
+        for th in self.threads:
             th.start()
         while self.should_run:
             now = time.time()
             self.report_status()
             time.sleep(3) #recheck() is invoked by monitors
-        for th in threads:
+        self._exit(0)
+    def _exit(self,retcode):
+        for th in self.threads:
             th.should_run = False
-        for th in threads:
+        for th in self.threads:
             th.join()
         logger.info("ZHA: main thread stopped.")
+        return retcode
     def report_status(self):
         report_str = ""
         #state
@@ -90,7 +93,8 @@ class ZHA(object):
         logging.info(report_str)
         if is_ok is False:
             logger.error("monitor/elector thread ended unexpectedly. Exit")
-            raise Exception("monitor/elector thread ended unexpectedly. Exit")
+            self._exit(1)
+        return report_str
     def set_state(self, state):
         self.state = state
     def recheck(self):

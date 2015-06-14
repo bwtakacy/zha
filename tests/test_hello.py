@@ -82,6 +82,22 @@ def test_handle_abc():
     assert obj.flg
     time.sleep(10)
 
+def test_handle_abc2():
+    subprocess.call("zookeeper-client create /zha-abc hostA",shell=True)
+    obj = type('',(),{})
+    obj.flg = False
+    def _f():
+        obj.flg = True
+        return 0
+    config=skelton.Config()
+    config.check_health=lambda:3
+    config.become_active=lambda:0
+    config.trigger_fence = _f
+    z = zha.ZHA(config)
+    trigger_zha(z)
+    assert obj.flg is False
+    time.sleep(10)
+
 def test_duplicate():
     config=skelton.Config()
     config.check_health=lambda:3
@@ -147,3 +163,17 @@ def test_fail_fence():
     assert obj.flg is False
     subprocess.call("zookeeper-client delete /zha-abc",shell=True)
     time.sleep(10)
+
+def test_unexpected_exception(self):
+    def _ch():
+        raise Exception("")
+    def _oa():
+        return 0
+    config=skelton.Config()
+    config.check_health=_ch
+    config.become_active =_oa
+    z = zha.ZHA(config)
+    ret = z.mainloop()
+    assert ret == 1
+    time.sleep(10)
+
