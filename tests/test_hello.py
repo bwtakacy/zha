@@ -113,4 +113,37 @@ def test_reentrant():
     z = zha.ZHA(config)
     trigger_zha(z,300)
     assert obj.act.__len__() > 2 and obj.sby.__len__() > 2
+    time.sleep(10)
 
+def test_fail_activate():
+    obj = type('',(),{})
+    obj.act=[]
+    def _oa():
+        obj.act.append(1)
+        return 1
+    config=skelton.Config()
+    config.check_health=lambda:3
+    config.become_active =_oa
+    z = zha.ZHA(config)
+    trigger_zha(z,120)
+    assert obj.act.__len__() > 10 
+    time.sleep(10)
+
+def test_fail_fence():
+    subprocess.call("zookeeper-client create /zha-abc dummy",shell=True)
+    obj = type('',(),{})
+    obj.flg = False
+    def _oa():
+        obj.flg = True
+        return 0
+    def _f():
+        return 1
+    config=skelton.Config()
+    config.check_health=lambda:3
+    config.become_active =_oa
+    config.trigger_fence = _f
+    z = zha.ZHA(config)
+    trigger_zha(z)
+    assert obj.flg is False
+    subprocess.call("zookeeper-client delete /zha-abc",shell=True)
+    time.sleep(10)
