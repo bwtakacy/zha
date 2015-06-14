@@ -92,3 +92,25 @@ def test_duplicate():
     assert "Same name zha seems to exist already, Exit." in str(exc.value)
     trigger_zha(z)
     time.sleep(10)
+
+def test_reentrant():
+    obj = type('',(),{})
+    obj.act=[]
+    obj.sby=[]
+    health_seq = itertools.cycle([3,3,3,3,1,1,1,1]) 
+    def _ch():
+        return health_seq.next()
+    def _oa():
+        obj.act.append(1)
+        return 0
+    def _os():
+        obj.sby.append(1)
+        return 0
+    config=skelton.Config()
+    config.check_health=_ch
+    config.become_active =_oa
+    config.become_standby_from_active =_os
+    z = zha.ZHA(config)
+    trigger_zha(z,300)
+    assert obj.act.__len__() > 2 and obj.sby.__len__() > 2
+
