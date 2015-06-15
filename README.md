@@ -4,9 +4,14 @@ Zha is a small python library that delivers high availability to an arbitary
 program.  Zha leverages Apache ZooKeeper and its python bindings kazoo, and is
 inspired from Apache Hadoop (HDFS ZKFC).
 
-Not familiar with python? No problem. Zha provides skelton program `skelton.py`,
+Not familiar with python? No problem. Zha provides scatfold program `skelton.py`,
 in which all callbacks are already implemented as invoking shell scripts.
 So with `skelton.py`, you can realize high availavility with any languages.
+
+Technically, zha is a statemachine with callbacks, by which automatic failover
+can be fullfilled.
+
+![StateMachine] (doc/StateMachine.png)
 
 This project is WIP, no stable release yet.
 
@@ -25,20 +30,7 @@ sudo pip install kazoo
 sudo pip install six --upgrade
 ```
 
-## LICENCE
-
-BSD, as embedded in `zha.py`
-
-## Releases
-
-- 2015/06/10: ver 0.1.1. RC release.
-- 2015/06/05: ver 0.1.0. This is a beta release.
-
-## Articles
-
-- http://qiita.com/sakamotomsh/items/c073bb662cff1c00decc
-
-## What zha provides
+## What zha do
 
 High availability cluster consists of one active process (ACT) and multiple
 standby processes (SBYs). When ACT faults, one of SBYs is selected as a new ACT
@@ -133,11 +125,35 @@ trigger_fence():
     This SHOULD always succeed, otherwise this zha stops failover.
 ```
 
-![StateMachine] (doc/StateMachine.png)
 
 ## Configuration
 
-TBW.
+All configuration parameter and its default value is listed as comment lines in `skelton.py`,
+which is extracted as below:
+
+```
+"id":                   "hostA",
+#"connection_string":   "127.0.0.1:2181",
+#"lock_znode":          "/zha-lock",
+#"abc_znode":           "/zha-abc",
+#"cluster_znode":       "/zha-state",
+#"clustercheck_interval":3,
+#"healthcheck_interval":5,
+#"elector_interval":    3,
+#"health_dms_timeout":  10,
+#"cluster_dms_timeout": 10,
+```
+
+`id` is zha identity, so its value must be unique in your cluster, so it is recommended
+to name it as hostname or hostname+servicename.`connection_string` specifies zookeeper
+emsemble. it should be colon separated string e.g. `zk1:2181,zk2:2181,zk3:2181`.
+`lock_znode`,`abc_znode`,and`cluster_znode` is a state store that all zha instance share,
+so they are all identical for all zha instances. If you use zha for multiple service failover,
+they should be changed such as `/zha-lock-mysql` or something.
+
+`clustercheck_interval`,`healthcheck_interval`,`elector_interval`,`health_dms_timeout`,
+and `cluster_dms_timeout` are all measured as seconds, and are internal timeout/interval,
+whose specification is TBW.
 
 ## Administration
 
@@ -185,4 +201,18 @@ at once, and b) deleting `abc_znode` by zkcli.
 ### Need manual failover?
 
 Send SIGINT to the zha on the ACT node.
+
+
+## LICENCE
+
+BSD, as embedded in `zha.py`
+
+## Releases
+
+- 2015/06/10: ver 0.1.1. RC release.
+- 2015/06/05: ver 0.1.0. This is a beta release.
+
+## Articles
+
+- http://qiita.com/sakamotomsh/items/c073bb662cff1c00decc
 
