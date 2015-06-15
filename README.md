@@ -141,6 +141,19 @@ TBW.
 
 ## Administration
 
+### Make sure `become_active` being reentrant
+
+On startup, internal state of zha is slightly different from the state of your
+resource. So at almost all cases, you need to care which zha should be started
+first. As you know, you should start zha on the node where your resource is 
+already active/master.
+
+For example, you set up master/slave database cluster first, then start zha on
+the master node, then start zha on the slave node. In this case, `become_active` 
+is invoked on the node where your resource is already active/master state.
+This indecates that `become_active` MUST BE IMPLEMENTED AS REENTRANT.
+
+
 ### Check zha is working
 You can check zha status by its stdout. Every 3 seconds status report
 will be reported as follows
@@ -168,4 +181,8 @@ resulting in invoking `on_declustred`.
 Sometimes you want to stop monitoring, that is, stop all zhas without
 invoking any callbacks. It is possible by a) sending SIGKILL to all zha
 at once, and b) deleting `abc_znode` by zkcli. 
+
+### Need manual failover?
+
+Send SIGINT to the zha on the ACT node.
 
