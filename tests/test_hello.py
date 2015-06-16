@@ -9,6 +9,8 @@ import time
 import itertools
 import subprocess
 import pytest
+from kazoo.client import KazooClient
+
 
 def trigger_zha(z,timeout=30):
     def run(obj):
@@ -16,6 +18,9 @@ def trigger_zha(z,timeout=30):
     thread.start_new_thread(run,(z,),{})
     time.sleep(timeout)
     z.stop()
+
+def setup_module():
+    subprocess.call("zookeeper-client delete /zha-state",shell=True)
 
 def test_being_standby():
     obj = type('',(),{})
@@ -176,4 +181,79 @@ def test_unexpected_exception():
     ret = z.mainloop()
     assert ret == 1
     time.sleep(10)
+
+def test_cluster_reentrant():
+    class DummyState(threading.Thread):
+        def __init__(self,duration):
+            self.duration = duration
+            threading.Thread.__init__(self)
+        def run(self):
+            subprocess.call("zookeeper-client create /zha-state/dummy SBY:HEALTHY",shell=True)
+            state = itertools.cycle(["SBY:HEALTHY","SBY:UNHEALTHY"])
+            while self.duration > 0:
+                time.sleep(20)
+                subprocess.call("zookeeper-client set /zha-state/dummy %s"%(state.next(),),shell=True)
+                self.duration -= 20
+            subprocess.call("zookeeper-client delete /zha-state/dummy",shell=True)
+    th = DummyState(300)
+    th.start()
+    obj = type('',(),{})
+    obj.c, obj.d = [], []
+    def _oc():
+        obj.c.append(1)
+        return 0
+    def _od():
+        obj.d.append(1)
+        return 0
+    config=skelton.Config()
+    config.check_health=lambda:3
+    config.become_active=lambda:0
+    config.become_clustered=_oc
+    config.become_declustered=_od
+    z = zha.ZHA(config)
+    trigger_zha(z,300)
+    th.join()
+    assert obj.c.__len__() > 3 and obj.d.__len__() > 3
+    time.sleep(10)
+
+def test_lock_timeout():
+    def locker():
+        zk = KazooClient(hosts="127.0.0.1:2181")
+        zk.start()
+        lock = self.zk.Lock("/zha-lock","test")
+        lock.acquire()
+        time.sleep(30)
+        lock.release()
+        zk.stop()
+    thread.start_new_thread(locker,(),{})
+    obj = type('',(),{})
+    obj.flg = False
+    def _oa():
+        obj.flg = True
+        return 0
+    config=skelton.Config()
+    config.check_health=lambda:3
+    config.become_active=_oa
+    z = zha.ZHA(config)
+    trigger_zha(z)
+    assert obj.flg is True
+    time.sleep(10)
+
+def test_leave_abc_behind():
+    obj = type('',(),{})
+    obj.flg = False
+    config=skelton.Config()
+    config.check_health=lambda:3
+    config.become_active=lambda:0
+    config.become_standby_from_active=lambda:-1
+    z = zha.ZHA(config)
+    trigger_zha(z)
+    zk = KazooClient(hosts="127.0.0.1:2181")
+    zk.start()
+    assert zk.exists("/zha-abc")
+    zk.stop()
+    time.sleep(10)
+
+def teardown_module():
+    subprocess.call("zookeeper-client delete /zha-state",shell=True)
 

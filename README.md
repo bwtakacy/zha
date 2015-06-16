@@ -9,16 +9,14 @@ in which all callbacks are already implemented as invoking shell scripts.
 So with `skelton.py`, you can realize high availavility with any languages.
 
 Technically, zha is a statemachine with callbacks, by which automatic failover
-can be fullfilled.
+is realized.
 
 ![StateMachine] (doc/StateMachine.png)
-
-This project is WIP, no stable release yet.
 
 ## Concepts
 
 - Small and Handy (~300 lines of code)
-- Well tested
+- Well tested ( 95%+ of coverage tests)
 - Well documented
 
 ## Install
@@ -192,15 +190,23 @@ healthmonitor, clustormonitor, elector is running or not.
 ### Stop zha without any interference
 When you stops zha, ACT zha tries to retire, that is, ceases to be ACT.
 Similaly, when you stops SBY zha, ACT zha detects SBY zha stopping, 
-resulting in invoking `on_declustred`.
+resulting in invoking `on_declustered`.
 
 Sometimes you want to stop monitoring, that is, stop all zhas without
 invoking any callbacks. It is possible by a) sending SIGKILL to all zha
-at once, and b) deleting `abc_znode` by zkcli. 
+at once, and b) deleting `abc_znode` by zkcli.
 
 ### Need manual failover?
 
 Send SIGINT to the zha on the ACT node.
+
+## OK, seems good, but what happens if...
+
+### when zookeeper connection is lost
+
+### when machine fault
+
+### when cluter is...
 
 
 ## LICENCE
