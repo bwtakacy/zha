@@ -203,10 +203,7 @@ class ClusterMonitor(threading.Thread):
             raise Exception("Same name zha seems to exist already, Exit.")
         if not self.zk.retry(self.zk.exists, self.zroot):
             self.zk.retry(self.zk.create, self.zroot,"",makepath=True)
-        if self.zk.exists(self.znode):
-            self.zk.retry(self.zk.set, self.znode, self.zha.state)
-        else:
-            self.zk.retry(self.zk.create, self.znode,self.zha.state, ephemeral=True)
+        self.zk.retry(self.zk.create, self.znode,self.zha.state, ephemeral=True)
 
 class Elector(threading.Thread):
     LOCKING, NOLOCK = 1,2
