@@ -24,7 +24,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
-__version__ = 'devel'
+__version__ = '0.2.0'
 import logging
 logging.basicConfig(format='%(asctime)-15s %(message)s', level=logging.INFO)
 logger = logging.getLogger('zha')
@@ -152,27 +152,30 @@ class ClusterMonitor(threading.Thread):
         self.zk.start()
         self.zroot = self.zha.config.get("cluster_znode","/zha-state")
         self.znode = self.zroot + "/" + self.zha.config.get("id") 
-        self._zk_register()
+        self._zk_register(first=True)
         self.not_alone = None
     def run(self):
         while self.should_run:
             time.sleep(self.zha.config.get("clustercheck_interval",3))
             self.zha.recheck()
-            self.zk.retry(self.zk.set, self.znode, self.zha.state)
+            self._zk_register()
             self.check_cluster()
             self.trigger()
-        self.zk.retry(self.zk.delete, self.znode)
+        self.zk.delete(self.znode)
         logger.info("cluster monitor thread stopped.")
     def check_cluster(self):
-        count = 0
-        chs = self.zk.retry(self.zk.get_children, self.zroot)
-        for ch in chs:
-            data, stats = self.zk.retry(self.zk.get, self.zroot+"/"+ch)
-            if data.strip()=="SBY:HEALTHY" and ch != self.zha.config.get("id"):
-                count += 1
-        if count != 0:
-            self.not_alone = time.time()
-        logger.debug("healthy sbys: %d"%(count,))
+        try:
+            count = 0
+            chs = self.zk.get_children(self.zroot)
+            for ch in chs:
+                data, stats = self.zk.get(self.zroot+"/"+ch)
+                if data.strip()=="SBY:HEALTHY" and ch != self.zha.config.get("id"):
+                    count += 1
+            if count != 0:
+                self.not_alone = time.time()
+            logger.debug("healthy sbys: %d"%(count,))
+        except Exception,e:
+            logger.warn("check cluster failed. Try next time.%s"%e)
     def trigger(self):
         if self.zha.state != "ACT:HEALTHY":
             return
@@ -196,14 +199,24 @@ class ClusterMonitor(threading.Thread):
             return
         else:
             return
-    def _zk_register(self):
-        #register my ephemeral znode
-        if self.zk.retry(self.zk.exists, self.znode):
-            logger.error("Same name zha seems to exist already, Exit.")
-            raise Exception("Same name zha seems to exist already, Exit.")
-        if not self.zk.retry(self.zk.exists, self.zroot):
-            self.zk.retry(self.zk.create, self.zroot,"",makepath=True)
-        self.zk.retry(self.zk.create, self.znode,self.zha.state, ephemeral=True)
+    def _zk_register(self,first=False):
+        try:
+            if not self.zk.exists(self.zroot):
+                self.zk.create(self.zroot,"",makepath=True)
+            if self.zk.exists(self.znode):
+                if first:
+                    logger.error("Same name zha seems to exist already, Exit.")
+                    raise AlreadyExistException("Same name zha seems to exist already, Exit.")
+                self.zk.set(self.znode,self.zha.state)
+            else:
+                self.zk.create(self.znode,self.zha.state, ephemeral=True)
+        except AlreadyExistException,e:
+            raise e
+        except Exception, e:
+            logger.warn("state-update failed. Try next time.%s"%e)
+
+class AlreadyExistException(Exception):
+    pass
 
 class Elector(threading.Thread):
     LOCKING, NOLOCK = 1,2

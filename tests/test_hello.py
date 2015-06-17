@@ -108,7 +108,7 @@ def test_duplicate():
     config.check_health=lambda:3
     config.become_active=lambda:0
     z = zha.ZHA(config)
-    with pytest.raises(Exception) as exc:
+    with pytest.raises(zha.AlreadyExistException) as exc:
         z2 = zha.ZHA(config)
     assert "Same name zha seems to exist already, Exit." in str(exc.value)
     trigger_zha(z)
@@ -217,15 +217,11 @@ def test_cluster_reentrant():
     time.sleep(10)
 
 def test_lock_timeout():
-    def locker():
-        zk = KazooClient(hosts="127.0.0.1:2181")
-        zk.start()
-        lock = self.zk.Lock("/zha-lock","test")
-        lock.acquire()
-        time.sleep(30)
-        lock.release()
-        zk.stop()
-    thread.start_new_thread(locker,(),{})
+    zk = KazooClient(hosts="127.0.0.1:2181")
+    zk.start()
+    lock = zk.Lock("/zha-lock","test")
+    lock.acquire()
+
     obj = type('',(),{})
     obj.flg = False
     def _oa():
@@ -236,7 +232,9 @@ def test_lock_timeout():
     config.become_active=_oa
     z = zha.ZHA(config)
     trigger_zha(z)
-    assert obj.flg is True
+    assert obj.flg is False
+    lock.release()
+    zk.stop()
     time.sleep(10)
 
 def test_leave_abc_behind():
