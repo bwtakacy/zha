@@ -200,25 +200,16 @@ at once, and b) deleting `abc_znode` by zkcli.
 
 Send SIGINT to the zha on the ACT node.
 
-## OK, seems good, but what happens if...
-
-### when zookeeper connection is lost
-
-### when machine fault
-
-### when cluter is...
-
-
 ## LICENCE
 
 BSD, as embedded in `zha.py`
 
 ## Releases
 
+- 2015/06/17: ver 0.2.0. release. First stable version.
 - 2015/06/10: ver 0.1.1. RC release.
 - 2015/06/05: ver 0.1.0. This is a beta release.
 
 ## Articles
 
 - http://qiita.com/sakamotomsh/items/c073bb662cff1c00decc
-
