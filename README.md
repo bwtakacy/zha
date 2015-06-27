@@ -4,12 +4,12 @@ Zha is a small python library that delivers high availability to an arbitary
 program.  Zha leverages Apache ZooKeeper and its python bindings kazoo, and is
 inspired from Apache Hadoop (HDFS ZKFC).
 
-Not familiar with python? No problem. Zha provides scatfold program `skelton.py`,
+Not familiar with python? No problem. Zha provides scaffoold program `skelton.py`,
 in which all callbacks are already implemented as invoking shell scripts.
-So with `skelton.py`, you can realize high availavility with any languages.
+So with `skelton.py`, you can realize high availavility with any languages
+you want.
 
-Technically, zha is a statemachine with callbacks, by which automatic failover
-is realized.
+Technically, zha is a statemachine with callbacks.
 
 ![StateMachine] (doc/StateMachine.png)
 
