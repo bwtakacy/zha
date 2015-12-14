@@ -1,3 +1,3 @@
-/usr/pgsql-9.4/bin/pg_ctl -D /var/lib/pgsql/9.4/data/ promote
-sudo ip addr add 192.168.0.10/24 dev eth0
-sudo arping 192.168.0.10 -I eth0 -c 3
+/usr/local/pgsql/9.4/bin/pg_ctl -D /home/postgres/pg_data/9.4 promote
+sudo ip addr add 172.27.104.212/16 dev eth0
+sudo arping 172.27.104.212 -I eth0 -c 3

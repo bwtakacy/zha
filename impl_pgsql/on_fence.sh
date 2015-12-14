@@ -1,1 +1,1 @@
-ssh serverA -c "sudo shutdown -h now"
+ssh oonishitk-pg1 -c "sudo shutdown -h now"

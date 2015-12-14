@@ -77,8 +77,8 @@ class Config(object):
 
     def __init__(self):
         self.properties = {
-                "id": "hostA",
-                #"connection_string":  "127.0.0.1:2181",
+                "id": "oonishitk-pg1",
+                "connection_string":  "oonishitk-pg1:2181,oonishitk-pg2:2181,oonishitk-pg3:2181",
                 #"lock_znode":         "/zha-lock",
                 #"abc_znode":          "/zha-abc",
                 #"cluster_znode":      "/zha-state",
@@ -94,27 +94,27 @@ class Config(object):
 
     @returns_zero_on_Exception
     def check_health(self):
-        return self._trigger_script_with_timeout(10, "impl/check_health.sh")
+        return self._trigger_script_with_timeout(10, "impl_pgsql/check_health.sh")
 
     @returns_minusone_on_Exception
     def become_active(self):
-        return self._trigger_script_with_timeout(10, "./impl/on_active.sh")
+        return self._trigger_script_with_timeout(10, "./impl_pgsql/on_active.sh")
 
     @returns_minusone_on_Exception
     def become_clustered(self):
-        return self._trigger_script_with_timeout(10, "./impl/on_clustered.sh")
+        return self._trigger_script_with_timeout(10, "./impl_pgsql/on_clustered.sh")
 
     @returns_minusone_on_Exception
     def become_declustered(self):
-        return self._trigger_script_with_timeout(10, "./impl/on_declustered.sh")
+        return self._trigger_script_with_timeout(10, "./impl_pgsql/on_declustered.sh")
 
     @returns_minusone_on_Exception
     def become_standby_from_active(self):
-        return self._trigger_script_with_timeout(10, "./impl/on_standby.sh")
+        return self._trigger_script_with_timeout(10, "./impl_pgsql/on_standby.sh")
 
     @returns_minusone_on_Exception
     def trigger_fence(self):
-        return self._trigger_script_with_timeout(10, "./impl/on_fence.sh")
+        return self._trigger_script_with_timeout(10, "./impl_pgsql/on_fence.sh")
 
     def _trigger_script_with_timeout(self,timeout, fname,*args):
         popen_args = ["/bin/bash",fname]
