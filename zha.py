@@ -161,6 +161,9 @@ class ClusterMonitor(threading.Thread):
             self._zk_register()
             self.check_cluster()
             self.trigger()
+        if self.zha.is_clustered:
+            self.zha.config.become_declustered()
+            self.zha.is_clustered = False
         self.zk.delete(self.znode)
         logger.info("cluster monitor thread stopped.")
     def check_cluster(self):
