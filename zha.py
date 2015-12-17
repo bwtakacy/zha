@@ -181,15 +181,21 @@ class ClusterMonitor(threading.Thread):
             return
         if self.zha.is_clustered:
             if time.time()-self.not_alone > self.zha.config.get("cluster_dms_timeout",10):
-                self.zha.config.become_declustered()
-                self.zha.is_clustered = False
+                if self.zha.config.become_declustered() == 0:
+                    logger.info("successfully declustered")
+                    self.zha.is_clustered = False
+                else:
+                    logger.info("declustering failed..")
                 return
         elif self.zha.is_clustered is False:
             if self.not_alone is None:
                 return
             if time.time()-self.not_alone < self.zha.config.get("cluster_dms_timeout",10):
-                self.zha.config.become_clustered()
-                self.zha.is_clustered = True
+                if self.zha.config.become_clustered() == 0:
+                    logger.info("successfully become clustered")
+                    self.zha.is_clustered = True
+                else:
+                    logger.info("clustering failed..")
                 return
     def _zk_listener(self,zkstate):
         logger.info("zookeeper connection state changed %s"%(zkstate,) )
