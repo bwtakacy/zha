@@ -1,1 +1,1 @@
-ssh oonishitk-pg1 -c "sudo shutdown -h now"
+ssh oonishitk-pg2 -c "sudo shutdown -h now"
