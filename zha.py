@@ -77,8 +77,13 @@ class ZHA(object):
     def report_status(self):
         report_str = ""
         #state
-        if self.is_clustered: report_str += "State=("+self.state+":CLUSTERED)"
-        else:                 report_str += "State=("+self.state+":DECLUSTERED)"
+        mode = self.state.split(":")[0]
+        report_str += "State=("+self.state
+        if mode == "ACT":
+            if self.is_clustered: report_str += ":CLUSTERED)"
+            else:                 report_str += ":DECLUSTERED)"
+        else:
+            report_str += ")"
         #health
         ttl_act = max([0, int(self.config.get("health_dms_timeout",10)-time.time()+self.last_health_ok_act)])
         ttl_sby = max([0, int(self.config.get("health_dms_timeout",10)-time.time()+self.last_health_ok_sby)])
