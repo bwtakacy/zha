@@ -1,1 +1,1 @@
-ssh oonishitk-pg2 -c "sudo shutdown -h now"
+ssh oonishitk-pg2 "pg_ctl stop -m i"

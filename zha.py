@@ -26,7 +26,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 __version__ = 'devel'
 import logging
-logging.basicConfig(format='%(asctime)-15s %(message)s', level=logging.INFO)
+LOG_FILENAME = 'zha.log'
+logging.basicConfig(filename=LOG_FILENAME, format='%(asctime)-15s %(message)s', level=logging.INFO)
 logger = logging.getLogger('zha')
 
 import signal
@@ -97,7 +98,7 @@ class ZHA(object):
                 report_str += "OFF,"
                 is_ok = False
         report_str += ")"
-        logging.info(report_str)
+        logger.info(report_str)
         if is_ok is False:
             logger.error("monitor/elector thread ended unexpectedly. Exit")
             self.retcode = 1
