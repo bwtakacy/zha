@@ -1,10 +1,11 @@
 # zha ![buildstatus] (https://travis-ci.org/sakamotomsh/zha.svg)
 
-Zha is a small python library that delivers high availability to an arbitary
-program.  Zha leverages Apache ZooKeeper and its python bindings kazoo, and is
+Zha is a small python library (single python file `zha.py` ) which delivers 
+high availability to an arbitary program. 
+Zha leverages Apache ZooKeeper and its python bindings kazoo, and is
 inspired from Apache Hadoop (HDFS ZKFC).
 
-Not familiar with python? No problem. Zha provides scaffoold program `skelton.py`,
+Not familiar with python? No problem. Zha provides scaffold program `skelton.py`,
 in which all callbacks are already implemented as invoking shell scripts.
 So with `skelton.py`, you can realize high availavility with any languages
 you want.
@@ -155,18 +156,31 @@ whose specification is TBW.
 
 ## Administration
 
+### Typical scenario
+
+- Start your program on each nodes (all nodes are expected to be SBYs)
+- Start zha on a node which you prefer to be ACT
+- Start zha on other nodes
+
+If your program cannot be SBY on startups, see the following section.
+
 ### Make sure `become_active` being reentrant
 
-On startup, internal state of zha is slightly different from the state of your
-resource. So at almost all cases, you need to care which zha should be started
-first. As you know, you should start zha on the node where your resource is 
-already active/master.
+It may be difficult for some program to start without any ACT(such as PostgreSQL).
+In this case, the order of nodes to start zha is important.
 
-For example, you set up master/slave database cluster first, then start zha on
-the master node, then start zha on the slave node. In this case, `become_active` 
-is invoked on the node where your resource is already active/master state.
-This indecates that `become_active` MUST BE IMPLEMENTED AS REENTRANT.
+- Start your program on each nodes
+- Start zha on an ACT node
+- Start zha on SBY nodes
 
+In this case, internal state of zha on ACT node is slightly different 
+from the state of your program, that is, zha starts up as SBY although
+your program is already ACT state. Then Zha calls `become_active` though
+your program is ACT state.
+
+This indecates that `become_active` MUST BE IMPLEMENTED AS REENTRANT,
+that is, you must implement `become_active` to be safe when invoked
+your program is already ACT.
 
 ### Check zha is working
 You can check zha status by its stdout. Every 3 seconds status report
