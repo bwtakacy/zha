@@ -100,7 +100,7 @@ class ZHA(object):
                 report_str += "OFF,"
                 is_ok = False
         report_str += ")"
-        logging.info(report_str)
+        logger.info(report_str)
         if is_ok is False:
             logger.error("monitor/elector thread ended unexpectedly. Exit")
             self.retcode = 1
