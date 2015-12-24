@@ -26,8 +26,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 __version__ = 'devel'
 import logging
-logging.basicConfig(format='%(asctime)-15s %(message)s', level=logging.INFO)
+import logging.handlers
+logging.basicConfig(format='%(levelname)s: %(asctime)-15s %(message)s', level=logging.INFO)
 logger = logging.getLogger('zha')
+handler = logging.handlers.SysLogHandler(address='/dev/log', facility='local0')
+logger.addHandler(handler)
 
 import signal
 import sys
